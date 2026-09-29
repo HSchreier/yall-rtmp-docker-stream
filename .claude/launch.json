@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sidecar",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["--env-file=.env", "run", "src/index.ts"],
+      "port": 8080
+    }
+  ]
+}

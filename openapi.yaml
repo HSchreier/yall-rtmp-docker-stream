@@ -1,0 +1,484 @@
+openapi: 3.0.3
+info:
+  title: yall-rtmp-docker-stream — sidecar API
+  version: "0.1.0"
+  contact:
+    name: Helmut Schreier
+  description: >
+    Second source of truth for the HTTP surface of the control/health sidecar.
+    docs/TECHNICAL.md is first — this spec is generated from its "Data objects"
+    section and must not drift from it. Nothing here that TECHNICAL.md doesn't
+    also describe, and nothing added here without updating TECHNICAL.md first.
+
+    Two things this spec structurally cannot express, documented in
+    docs/TECHNICAL.md §Security suite rather than faked here:
+    - /auth/register's bootstrap exception (unauthenticated exactly once, only
+      while the users collection is empty; admin-gated forever after).
+    - /profile's ownership check (role `user` is only sometimes enough — it
+      also has to be *this* user's own profile). OpenAPI's `security` block is
+      static per-operation, not conditional on request params or DB state.
+    Both are covered by unit tests instead (AuthService's bootstrap-race test,
+    and the ownership tests in docs/TECHNICAL.md §Testing strategy).
+
+servers:
+  - url: http://{host}:{port}
+    variables:
+      host:
+        default: localhost
+      port:
+        default: "8080"
+
+tags:
+  - name: auth
+  - name: profile
+    description: Per-user destination profiles (own keys, own ingest key) and activation.
+  - name: monitoring
+    description: Public, unauthenticated. Already scrubbed of secrets.
+  - name: internal
+    description: >
+      Loopback-only — nginx itself calls these via the nginx-rtmp notify
+      module. Never reachable from outside the container. Exact request body
+      shape is nginx-rtmp's own notify-module payload (form-encoded, not
+      JSON) — field names below are provisional, not yet verified against a
+      real nginx-rtmp build. See docs/TECHNICAL.md open questions.
+
+paths:
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Authenticate an existing account.
+      description: Email + password against UserRepository. On success, issues a JWT and sets the session cookie.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: >
+            Also sets an HttpOnly/Secure/SameSite=Strict session cookie
+            carrying the same JWT — the body's token is for programmatic
+            callers (curl, scripts), the cookie is what the browser UI uses.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          description: Wrong email or password. Deliberately generic — never confirms whether the email exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Create an account.
+      description: >
+        Two very different auth requirements depending on server state, which
+        this spec cannot express — see the note in `info.description`.
+        Empty `users` collection: unauthenticated, exactly once, `role` in
+        the request body is ignored and forced to `admin`.
+        Non-empty `users` collection: requires a valid `admin` JWT; `role` is
+        honored as sent.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+        - {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: Account created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          description: Valid session, but not an admin (and the bootstrap window is closed).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: An account with that email already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /profile:
+    get:
+      operationId: getOwnProfile
+      tags: [profile]
+      summary: Read the caller's own destination profile.
+      description: Scoped to the caller's own userId from the verified JWT — never a userId from the URL or body.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The caller's destination profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '401':
+          $ref: '#/components/responses/AuthError'
+    put:
+      operationId: updateOwnProfile
+      tags: [profile]
+      summary: Update the caller's own destination profile (partial).
+      description: >
+        `ingestStreamKey` is server-generated on first write and is not
+        client-settable — it never appears in the request body, only the
+        response.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileUpdateRequest'
+      responses:
+        '200':
+          description: The updated profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          description: >
+            No destination enabled, or an enabled destination has no key —
+            "Turn on at least one destination" / "Add a stream key for
+            {names}, or turn it off."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/AuthError'
+        '503':
+          $ref: '#/components/responses/UpstreamError'
+
+  /profile/activate:
+    post:
+      operationId: activateOwnProfile
+      tags: [profile]
+      summary: Make the caller's own profile the active one.
+      description: >
+        If someone else's profile is currently active and its stream status
+        isn't `offline`, the UI shows a confirmation dialog first (see
+        docs/design-briefs/screens-and-journeys.md §S6) — this endpoint
+        itself doesn't distinguish a confirmed call from an unconfirmed one,
+        confirmation is client-side only. Activating always cuts off whoever
+        was previously live; see docs/TECHNICAL.md open questions on whether
+        that should instead be a hard block.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: This profile is now active.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivateResponse'
+        '401':
+          $ref: '#/components/responses/AuthError'
+        '503':
+          $ref: '#/components/responses/UpstreamError'
+
+  /users/{userId}/activate:
+    post:
+      operationId: activateUserProfile
+      tags: [profile]
+      summary: Admin-only — make a named user's profile the active one.
+      description: Same disruptive-handoff behavior as POST /profile/activate, just targeting another account. Admin can activate any profile but cannot edit its stream keys — see docs/TECHNICAL.md, Explicitly not doing.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The named user's profile is now active.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivateResponse'
+        '401':
+          $ref: '#/components/responses/AuthError'
+        '403':
+          description: Valid session, but not an admin.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No such user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/UpstreamError'
+
+  /health:
+    get:
+      operationId: getHealth
+      tags: [monitoring]
+      summary: Liveness/readiness. Public, unauthenticated, no secrets.
+      description: A 200 with ingestStatus "offline" is a healthy-but-idle state, not an error — only nginxReachable/mongoReachable false indicates something's actually wrong.
+      security: []
+      responses:
+        '200':
+          description: Current health snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [monitoring]
+      summary: Current stream stats. Public, unauthenticated, no secrets.
+      description: bytesIn/bitrateKbps/since only meaningful while ingestStatus isn't "offline" — see StatsResponse.
+      security: []
+      responses:
+        '200':
+          description: Current stats snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsResponse'
+
+  /events:
+    get:
+      operationId: streamEvents
+      tags: [monitoring]
+      summary: Server-Sent Events — StreamState changes plus nginx/Mongo degraded-state pushes.
+      description: Long-lived connection. One EventBus subscription server-side fans out to every open connection — see docs/TECHNICAL.md §Frontend & first install.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: >
+            text/event-stream. Payload of each event matches the
+            corresponding EventBus payload documented in docs/TECHNICAL.md
+            §Data objects (StreamStarted, StreamEnded, StreamIdle,
+            StreamResumed, StreamStatUpdated, nginx.crashed, Mongo
+            connectivity changes) — not duplicated here to avoid drift.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  /internal/nginx/on-publish:
+    post:
+      operationId: nginxOnPublish
+      tags: [internal]
+      summary: nginx-rtmp notify-module callback — a publish started.
+      description: Path is provisional, not yet verified — see docs/TECHNICAL.md open questions.
+      security: []
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              description: nginx-rtmp's own notify payload — field names not yet confirmed against a real build.
+      responses:
+        '200':
+          description: Publish accepted.
+        '4XX':
+          description: Publish rejected (unknown stream key).
+
+  /internal/nginx/on-publish-done:
+    post:
+      operationId: nginxOnPublishDone
+      tags: [internal]
+      summary: nginx-rtmp notify-module callback — a publish ended.
+      description: Path is provisional, not yet verified — see docs/TECHNICAL.md open questions.
+      security: []
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Acknowledged.
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+      description: HttpOnly/Secure/SameSite=Strict cookie set by /auth/login. What the browser UI uses.
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Same JWT as the cookie, for programmatic callers (curl, scripts).
+
+  responses:
+    ValidationError:
+      description: Malformed request body.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    AuthError:
+      description: Missing, invalid, or expired session (cookie or Bearer).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    UpstreamError:
+      description: Mongo or nginx unreachable when a write/render was attempted. Nothing changed; safe to retry.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      description: >
+        Shape for every AppError subclass (docs/TECHNICAL.md §Typed errors).
+        An unexpected (non-AppError) exception becomes a generic 500 with
+        this same envelope but no internal detail — the message is never the
+        raw error or a stack trace.
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: CONFLICT
+            message:
+              type: string
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+
+    LoginResponse:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: JWT. Carries `role` in its payload.
+
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 12 }
+        role:
+          type: string
+          enum: [user, admin]
+          description: Ignored and forced to `admin` on the one unauthenticated bootstrap call.
+
+    RegisterResponse:
+      type: object
+      required: [userId, email, role]
+      properties:
+        userId: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [user, admin] }
+
+    DestinationEntry:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
+        streamKey: { type: string }
+        customIngestUrl:
+          type: string
+          description: Optional override; falls back to the platform default when unset (see docs/TECHNICAL.md §Persistence & auth).
+
+    Profile:
+      type: object
+      required: [ingestStreamKey, mixcloud, youtube, twitch, updatedAt, updatedBy]
+      properties:
+        ingestStreamKey:
+          type: string
+          description: Server-generated, once, on first write. Never secret from its own owner — only from the public.
+        mixcloud: { $ref: '#/components/schemas/DestinationEntry' }
+        youtube: { $ref: '#/components/schemas/DestinationEntry' }
+        twitch: { $ref: '#/components/schemas/DestinationEntry' }
+        updatedAt: { type: string, format: date-time }
+        updatedBy:
+          type: string
+          description: Always the verified JWT's user id — never client-supplied.
+
+    ProfileUpdateRequest:
+      type: object
+      properties:
+        mixcloud: { $ref: '#/components/schemas/DestinationEntry' }
+        youtube: { $ref: '#/components/schemas/DestinationEntry' }
+        twitch: { $ref: '#/components/schemas/DestinationEntry' }
+
+    ActivateResponse:
+      type: object
+      required: [activeUserId, activatedAt]
+      properties:
+        activeUserId: { type: string }
+        activatedAt: { type: string, format: date-time }
+
+    HealthResponse:
+      type: object
+      required: [ingestStatus, nginxReachable, mongoReachable, at]
+      properties:
+        ingestStatus:
+          type: string
+          enum: [offline, live, idle]
+        nginxReachable: { type: boolean }
+        mongoReachable: { type: boolean }
+        at: { type: string, format: date-time }
+
+    StatsResponse:
+      type: object
+      required: [ingestStatus, at]
+      description: bytesIn/bitrateKbps/since only meaningful while ingestStatus != offline (exact shape when offline is an open question — see docs/TECHNICAL.md).
+      properties:
+        ingestStatus:
+          type: string
+          enum: [offline, live, idle]
+        bytesIn: { type: integer }
+        bitrateKbps: { type: number }
+        since: { type: string, format: date-time }
+        at: { type: string, format: date-time }

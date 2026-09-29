@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/modernist-c925a2ce-9e97-4da0-ae41-a0102588b2e2/styles.css">
+<script src="_ds/modernist-c925a2ce-9e97-4da0-ae41-a0102588b2e2/_ds_bundle.js"></script>
+<style>body{margin:0}a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}</style>
+</helmet>
+<div style="min-height:100vh;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);padding-bottom:120px">
+
+<sc-if value="{{ authed }}" hint-placeholder-val="{{ false }}">
+  <header class="nav" style="flex-wrap:wrap;row-gap:var(--space-2)">
+    <span class="nav-brand">Relay</span>
+    <div style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;font-size:13px">
+      <span>{{ meEmail }}</span>
+      <span class="tag tag-neutral" style="text-transform:uppercase;letter-spacing:.08em">{{ meRole }}</span>
+      <sc-if value="{{ amActive }}"><span style="display:flex;align-items:center;gap:6px;font-weight:600;color:var(--color-accent-700)"><span style="width:8px;height:8px;background:var(--color-accent)"></span>Active profile</span></sc-if>
+      <sc-if value="{{ notActive }}"><span style="display:flex;align-items:center;gap:6px;color:var(--color-neutral-700)"><span style="width:8px;height:8px;border:1.5px solid var(--color-neutral-600)"></span>Not active</span></sc-if>
+      <button class="btn btn-secondary" onClick="{{ logout }}">Log out</button>
+    </div>
+  </header>
+</sc-if>
+<sc-if value="{{ unauthed }}" hint-placeholder-val="{{ true }}">
+  <header class="nav"><span class="nav-brand">Relay</span><span style="font-size:13px;color:var(--color-neutral-700)">Stream relay · this box</span></header>
+</sc-if>
+
+<sc-if value="{{ showBanner }}">
+  <div role="status" style="display:flex;align-items:flex-start;gap:var(--space-3);padding:var(--space-3) var(--space-4);background:var(--color-accent-100);color:var(--color-accent-800);border-bottom:2px solid var(--color-accent)">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:2px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>
+    <span style="flex:1;font-size:14px;font-weight:600">{{ bannerText }}</span>
+    <button class="btn btn-icon" aria-label="Dismiss" onClick="{{ dismissBanner }}" style="width:28px;height:28px;color:var(--color-accent-800)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+  </div>
+</sc-if>
+
+<main style="max-width:1120px;margin:0 auto;padding:var(--space-8) var(--space-6)">
+
+<sc-if value="{{ isAuthScreen }}">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));border-top:2px solid var(--color-divider);border-bottom:2px solid var(--color-divider)">
+    <div style="padding:var(--space-8) var(--space-6) var(--space-8) 0">
+      <div class="card-kicker" style="margin-bottom:var(--space-3)">{{ authKicker }}</div>
+      <h1 style="font-size:56px;text-wrap:balance">{{ authTitle }}</h1>
+      <p style="max-width:40ch;color:var(--color-neutral-700);text-wrap:pretty">{{ authLede }}</p>
+    </div>
+    <form onSubmit="{{ submitAuth }}" style="display:flex;flex-direction:column;gap:var(--space-4);padding:var(--space-8) 0 var(--space-8) var(--space-6);border-left:2px solid var(--color-divider);max-width:480px">
+      <sc-if value="{{ notice }}"><div style="padding:var(--space-3);background:var(--color-neutral-200);font-size:14px;font-weight:600">{{ notice }}</div></sc-if>
+      <div class="field"><label for="a-email">Email</label><input id="a-email" class="input" type="email" autocomplete="username" value="{{ authEmail }}" onChange="{{ onAuthEmail }}"></div>
+      <div class="field"><label for="a-pw">Password</label>
+        <div style="display:flex;gap:var(--space-2)"><input id="a-pw" class="input" type="{{ authPwType }}" value="{{ authPassword }}" onChange="{{ onAuthPassword }}"><button type="button" class="btn btn-secondary" style="width:64px;justify-content:flex-start" onClick="{{ toggleAuthReveal }}">{{ authRevealLabel }}</button></div>
+        <sc-if value="{{ isSetup }}"><div style="font-size:12px;color:var(--color-neutral-700);margin-top:5px">At least 12 characters.</div></sc-if>
+      </div>
+      <sc-if value="{{ isSetup }}"><div style="font-size:13px;color:var(--color-neutral-700)">This account will be the box's administrator.</div></sc-if>
+      <sc-if value="{{ authError }}"><div role="alert" style="font-size:14px;font-weight:600;color:var(--color-accent-700)">{{ authError }}</div></sc-if>
+      <button type="submit" class="btn btn-primary btn-block" disabled="{{ authBusy }}" style="min-height:44px">{{ authSubmitLabel }}</button>
+    </form>
+  </div>
+</sc-if>
+
+<sc-if value="{{ showProfileForm }}">
+  <section style="border-top:2px solid var(--color-divider);margin-bottom:var(--space-8)">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:var(--space-4);flex-wrap:wrap;padding:var(--space-6) 0">
+      <div>
+        <div class="card-kicker" style="margin-bottom:var(--space-2)">{{ formKicker }}</div>
+        <h2 style="margin:0">{{ formTitle }}</h2>
+        <p style="margin:var(--space-2) 0 0;color:var(--color-neutral-700);max-width:56ch;text-wrap:pretty">{{ formLede }}</p>
+      </div>
+      <sc-if value="{{ isEdit }}"><button class="btn btn-secondary" onClick="{{ closePanel }}">Close</button></sc-if>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:2px;background:var(--color-divider);border:2px solid var(--color-divider)">
+      <sc-for list="{{ destRows }}" as="d" hint-placeholder-count="3">
+        <div style="background:var(--color-bg);padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-3)">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-2)">
+            <h4 style="margin:0">{{ d.name }}</h4>
+            <div class="seg" role="radiogroup" aria-label="{{ d.name }}">
+              <label class="seg-opt"><input type="radio" name="{{ d.radioName }}" checked="{{ d.off }}" onChange="{{ d.setOff }}">Off</label>
+              <label class="seg-opt"><input type="radio" name="{{ d.radioName }}" checked="{{ d.on }}" onChange="{{ d.setOn }}">On</label>
+            </div>
+          </div>
+          <div class="field"><label>Stream key</label>
+            <div style="display:flex;gap:var(--space-2)"><input class="input" type="{{ d.inputType }}" value="{{ d.key }}" onChange="{{ d.onKey }}" disabled="{{ d.off }}" placeholder="{{ d.placeholder }}" autocomplete="off"><button type="button" class="btn btn-secondary" style="width:64px;justify-content:flex-start" onClick="{{ d.toggleReveal }}" disabled="{{ d.off }}">{{ d.revealLabel }}</button></div>
+          </div>
+          <sc-if value="{{ advanced }}">
+            <div class="field"><label>Custom ingest URL (optional)</label><input class="input" value="{{ d.url }}" onChange="{{ d.onUrl }}" disabled="{{ d.off }}" placeholder="{{ d.defaultUrl }}"></div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-4);flex-wrap:wrap;padding:var(--space-4) 0;border-bottom:2px solid var(--color-divider)">
+      <button class="btn btn-ghost" onClick="{{ toggleAdvanced }}">{{ advancedLabel }}</button>
+      <div style="display:flex;align-items:center;gap:var(--space-4);flex-wrap:wrap">
+        <sc-if value="{{ formError }}"><span role="alert" style="font-size:14px;font-weight:600;color:var(--color-accent-700);max-width:48ch">{{ formError }}</span></sc-if>
+        <sc-if value="{{ saveMsg }}"><span role="status" style="font-size:14px;font-weight:600">{{ saveMsg }}</span></sc-if>
+        <button class="btn btn-primary" style="min-width:180px;min-height:44px;justify-content:flex-start" disabled="{{ saveBusy }}" onClick="{{ saveProfile }}">{{ saveLabel }}</button>
+      </div>
+    </div>
+    <sc-if value="{{ isEdit }}">
+      <div style="padding:var(--space-4) 0;display:flex;flex-direction:column;gap:var(--space-2)">
+        <div class="card-kicker">Your OBS ingest URL · read-only</div>
+        <code style="font-size:14px;word-break:break-all">{{ ingestUrl }}</code>
+      </div>
+    </sc-if>
+  </section>
+</sc-if>
+
+<sc-if value="{{ isFirstRunDone }}">
+  <section style="border-top:2px solid var(--color-divider);border-bottom:2px solid var(--color-divider);padding:var(--space-8) 0;display:flex;flex-direction:column;gap:var(--space-4)">
+    <div class="card-kicker">Profile saved</div>
+    <h1 style="margin:0">Point OBS here.</h1>
+    <p style="margin:0;color:var(--color-neutral-700);max-width:56ch">{{ firstRunDoneNote }}</p>
+    <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;align-items:stretch;border:2px solid var(--color-accent);padding:var(--space-4);background:var(--color-accent-100)">
+      <code style="flex:1 1 320px;font-size:20px;font-weight:600;word-break:break-all;align-self:center">{{ ingestUrl }}</code>
+      <button class="btn btn-primary" style="min-height:44px;min-width:120px;justify-content:flex-start" onClick="{{ copyIngest }}">{{ copyLabel }}</button>
+    </div>
+    <div style="font-size:13px;color:var(--color-neutral-700)">In OBS: Settings → Stream → Service “Custom”, paste the server URL above. You can find it again under Edit profile.</div>
+    <div><button class="btn btn-primary" style="min-height:44px;min-width:200px;justify-content:flex-start" onClick="{{ goDashboard }}">Go to dashboard →</button></div>
+  </section>
+</sc-if>
+
+<sc-if value="{{ isDash }}">
+  <div style="display:flex;flex-direction:column;gap:var(--space-8)">
+    <sc-if value="{{ handoffMsg }}">
+      <div style="display:flex;gap:var(--space-3);align-items:center;padding:var(--space-3) var(--space-4);background:var(--color-accent-100);color:var(--color-accent-800);border:2px solid var(--color-accent);font-size:14px"><span style="flex:1;font-weight:600">{{ handoffMsg }}</span><button class="btn btn-primary" onClick="{{ clearHandoff }}">OK</button></div>
+    </sc-if>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:2px;background:var(--color-divider);border:2px solid var(--color-divider)">
+      <sc-if value="{{ sLive }}">
+        <div style="background:var(--color-accent);color:var(--color-bg);padding:var(--space-6);display:flex;flex-direction:column;gap:var(--space-4);min-height:240px">
+          <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600">Broadcast · {{ activeName }}</div>
+          <div style="font-family:var(--font-heading);font-weight:800;font-size:88px;line-height:.9;letter-spacing:-.03em">Live</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;border-top:2px solid var(--color-bg);padding-top:var(--space-3);margin-top:auto">
+            <div><div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase">Bitrate</div><div style="font-size:24px;font-weight:800">{{ bitrateText }}</div></div>
+            <div><div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase">Received</div><div style="font-size:24px;font-weight:800">{{ bytesText }}</div></div>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ sIdle }}">
+        <div style="background:var(--color-bg);padding:var(--space-6);display:flex;flex-direction:column;gap:var(--space-4);min-height:240px;box-shadow:inset 0 0 0 4px var(--color-accent)">
+          <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--color-accent-700)">Broadcast · {{ activeName }}</div>
+          <div style="font-family:var(--font-heading);font-weight:800;font-size:88px;line-height:.9;letter-spacing:-.03em;color:var(--color-accent)">Idle</div>
+          <p style="margin:auto 0 0;font-size:14px;font-weight:600;border-top:2px solid var(--color-accent);padding-top:var(--space-3)">OBS is connected but no video is arriving. Check the OBS output and your connection.</p>
+        </div>
+      </sc-if>
+      <sc-if value="{{ sOffline }}">
+        <div style="background:var(--color-bg);padding:var(--space-6);display:flex;flex-direction:column;gap:var(--space-4);min-height:240px">
+          <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--color-neutral-700)">Broadcast · {{ activeName }}</div>
+          <div style="font-family:var(--font-heading);font-weight:800;font-size:88px;line-height:.9;letter-spacing:-.03em;color:var(--color-neutral-500)">Offline</div>
+          <p style="margin:auto 0 0;font-size:14px;border-top:2px solid var(--color-divider);padding-top:var(--space-3)">{{ offlineNote }}</p>
+        </div>
+      </sc-if>
+      <sc-if value="{{ sUnknown }}">
+        <div style="background:var(--color-bg);padding:var(--space-6);display:flex;flex-direction:column;gap:var(--space-4);min-height:240px;background-image:repeating-linear-gradient(135deg,transparent 0 10px,var(--color-neutral-200) 10px 12px)">
+          <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--color-neutral-700)">Broadcast status</div>
+          <div style="font-family:var(--font-heading);font-weight:800;font-size:64px;line-height:.95;letter-spacing:-.03em">Unknown</div>
+          <p style="margin:auto 0 0;font-size:14px;font-weight:600;border-top:2px solid var(--color-divider);padding-top:var(--space-3);background:var(--color-bg)">Lost the live connection to this box — reconnecting. The last status isn't shown because it may be out of date.</p>
+        </div>
+      </sc-if>
+
+      <div style="background:var(--color-bg);padding:var(--space-6);display:flex;flex-direction:column;gap:var(--space-4);min-height:240px">
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:var(--color-neutral-700)">Active profile</div>
+        <h2 style="margin:0;font-size:32px;text-wrap:balance">{{ activeLine }}</h2>
+        <p style="margin:0;font-size:14px;color:var(--color-neutral-700);text-wrap:pretty">{{ activeSub }}</p>
+        <div style="margin-top:auto;display:flex;flex-direction:column;gap:var(--space-2)">
+          <sc-if value="{{ canActivateSelf }}"><button class="btn btn-primary btn-block" style="min-height:44px" onClick="{{ activateSelf }}">Activate my profile</button></sc-if>
+          <sc-if value="{{ actErr }}"><div role="alert" style="font-size:14px;font-weight:600;color:var(--color-accent-700)">{{ actErr }}</div></sc-if>
+        </div>
+      </div>
+    </div>
+
+    <sc-if value="{{ amActive }}">
+      <section style="border-top:2px solid var(--color-divider);padding-top:var(--space-4);display:flex;flex-direction:column;gap:var(--space-3)">
+        <div class="card-kicker">OBS ingest URL · stream here</div>
+        <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;align-items:stretch;border:2px solid var(--color-accent);padding:var(--space-3) var(--space-4);background:var(--color-accent-100)">
+          <code style="flex:1 1 320px;font-size:18px;font-weight:600;word-break:break-all;align-self:center">{{ ingestUrl }}</code>
+          <button class="btn btn-primary" style="min-height:44px;min-width:110px;justify-content:flex-start" onClick="{{ copyIngest }}">{{ copyLabel }}</button>
+        </div>
+      </section>
+    </sc-if>
+
+    <section style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:2px;background:var(--color-accent);border:2px solid var(--color-accent)">
+      <button onClick="{{ openEdit }}" style="all:unset;cursor:pointer;background:var(--color-accent-100);color:var(--color-accent-800);padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-1);min-height:44px" style-hover="background:var(--color-accent);color:var(--color-bg)" style-active="background:var(--color-accent-700);color:var(--color-bg)">
+        <span style="font-family:var(--font-heading);font-weight:800;font-size:17px">Edit my profile →</span>
+        <span style="font-size:13px">{{ destSummary }}</span>
+      </button>
+      <sc-if value="{{ isAdmin }}">
+        <button onClick="{{ openRegister }}" style="all:unset;cursor:pointer;background:var(--color-accent-100);color:var(--color-accent-800);padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-1);min-height:44px" style-hover="background:var(--color-accent);color:var(--color-bg)" style-active="background:var(--color-accent-700);color:var(--color-bg)">
+          <span style="font-family:var(--font-heading);font-weight:800;font-size:17px">Register a user →</span>
+          <span style="font-size:13px">Admin · create an account for a performer</span>
+        </button>
+      </sc-if>
+    </section>
+
+    <sc-if value="{{ showRegister }}">
+      <section style="border-top:2px solid var(--color-divider)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:var(--space-4);padding:var(--space-6) 0">
+          <div><div class="card-kicker" style="margin-bottom:var(--space-2)">Admin</div><h2 style="margin:0">Register a user</h2></div>
+          <button class="btn btn-secondary" onClick="{{ closePanel }}">Close</button>
+        </div>
+        <form onSubmit="{{ submitRegister }}" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:var(--space-4);align-items:end;padding-bottom:var(--space-6);border-bottom:2px solid var(--color-divider)">
+          <div class="field"><label for="r-email">Email</label><input id="r-email" class="input" type="email" value="{{ regEmail }}" onChange="{{ onRegEmail }}"></div>
+          <div class="field"><label for="r-pw">Password · 12+ characters</label><input id="r-pw" class="input" type="password" value="{{ regPassword }}" onChange="{{ onRegPassword }}" autocomplete="new-password"></div>
+          <div class="field"><label>Role</label>
+            <div class="seg" style="display:flex">
+              <label class="seg-opt" style="flex:1"><input type="radio" name="r-role" checked="{{ regIsUser }}" onChange="{{ setRegUser }}">User</label>
+              <label class="seg-opt" style="flex:1"><input type="radio" name="r-role" checked="{{ regIsAdmin }}" onChange="{{ setRegAdmin }}">Admin</label>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary" style="min-height:44px;justify-content:flex-start">Create account</button>
+          <sc-if value="{{ regError }}"><div role="alert" style="grid-column:1/-1;font-size:14px;font-weight:600;color:var(--color-accent-700)">{{ regError }}</div></sc-if>
+          <sc-if value="{{ regOk }}"><div role="status" style="grid-column:1/-1;font-size:14px;font-weight:600">{{ regOk }}</div></sc-if>
+        </form>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ isAdmin }}">
+      <section>
+        <h6 style="margin:0 0 var(--space-2)">All users</h6>
+        <div style="overflow-x:auto">
+          <table class="table">
+            <thead><tr><th>Account</th><th>Role</th><th>Profile</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              <sc-for list="{{ userRows }}" as="u" hint-placeholder-count="3">
+                <tr>
+                  <td style="font-weight:600">{{ u.email }}</td>
+                  <td>{{ u.role }}</td>
+                  <td style="color:var(--color-neutral-700)">{{ u.profileText }}</td>
+                  <td><sc-if value="{{ u.isActive }}"><span class="tag tag-accent">{{ u.statusText }}</span></sc-if></td>
+                  <td style="text-align:right"><sc-if value="{{ u.canActivate }}"><button class="btn btn-primary" style="min-height:36px" onClick="{{ u.onActivate }}">Activate</button></sc-if></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </sc-if>
+  </div>
+</sc-if>
+</main>
+
+<sc-if value="{{ modalOpen }}">
+  <div class="dialog-backdrop" onClick="{{ closeModal }}">
+    <div class="dialog" role="alertdialog" aria-modal="true" onClick="{{ stop }}" style="border-top:4px solid var(--color-accent)">
+      <div class="card-kicker">{{ modalKicker }}</div>
+      <div class="dialog-title">{{ modalTitle }}</div>
+      <div class="dialog-body">{{ modalBody }}</div>
+      <div class="dialog-actions">
+        <button class="btn btn-secondary" style="min-height:44px" onClick="{{ closeModal }}">{{ cancelLabel }}</button>
+        <sc-if value="{{ modalCanConfirm }}"><button class="btn btn-primary" style="min-height:44px;min-width:160px;justify-content:flex-start" onClick="{{ confirmModal }}">{{ confirmLabel }}</button></sc-if>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ showSim }}">
+  <aside style="position:fixed;right:16px;bottom:16px;z-index:50;width:min(320px,calc(100vw - 32px));background:var(--color-neutral-900);color:var(--color-neutral-100);font-size:12px;box-shadow:var(--shadow-lg)">
+    <button onClick="{{ toggleSim }}" style="all:unset;cursor:pointer;display:flex;justify-content:space-between;width:100%;box-sizing:border-box;padding:10px 12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:11px"><span>Simulate · prototype only</span><span>{{ simToggleLabel }}</span></button>
+    <sc-if value="{{ simOpen }}">
+      <div style="display:flex;flex-direction:column;gap:10px;padding:0 12px 12px">
+        <sc-for list="{{ simGroups }}" as="g" hint-placeholder-count="4">
+          <div style="border-top:1px solid var(--color-neutral-700);padding-top:8px">
+            <div style="color:var(--color-neutral-400);margin-bottom:6px">{{ g.label }}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px">
+              <sc-for list="{{ g.items }}" as="b">
+                <button onClick="{{ b.run }}" style="all:unset;cursor:pointer;padding:5px 8px;border:1px solid var(--color-neutral-600);font-size:12px" style-hover="background:var(--color-neutral-800);border-color:var(--color-accent-400)">{{ b.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </aside>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startAt&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;First install&quot;,&quot;Admin, on air&quot;,&quot;User, handing off&quot;,&quot;Logged out&quot;],&quot;default&quot;:&quot;Admin, on air&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Scenario&quot;},&quot;blockWhileLive&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Open questions&quot;},&quot;showSimulator&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Scenario&quot;}}">
+const META = [
+  { id: 'mixcloud', name: 'Mixcloud', url: 'rtmp://rtmp.mixcloud.com/broadcast' },
+  { id: 'youtube', name: 'YouTube', url: 'rtmp://a.rtmp.youtube.com/live2' },
+  { id: 'twitch', name: 'Twitch', url: 'rtmp://live.twitch.tv/app' }
+];
+const HOST = 'rtmp://relay.local/ingest/';
+const hhmm = () => new Date().toTimeString().slice(0, 5);
+const genKey = () => Array.from({ length: 4 }, () => Math.random().toString(36).slice(2, 6).padEnd(4, 'x')).join('-');
+const blankDraft = () => ({ mixcloud: { on: false, key: '', url: '' }, youtube: { on: false, key: '', url: '' }, twitch: { on: false, key: '', url: '' } });
+const clone = o => JSON.parse(JSON.stringify(o));
+const START = { 'First install': 'first', 'Admin, on air': 'admin', 'User, handing off': 'user', 'Logged out': 'login' };
+
+function seedUsers() {
+  return [
+    { email: 'ops@relay.local', password: 'relaybox1234', role: 'admin', ingestKey: 'k7d2-9fqa-x31m-p0zt',
+      profile: { mixcloud: { on: true, key: 'mc_8f2a91c0', url: '' }, youtube: { on: true, key: 'yt-4k2x-9pqa-77ma', url: '' }, twitch: { on: false, key: '', url: '' } } },
+    { email: 'sam@relay.local', password: 'relaybox1234', role: 'user', ingestKey: 'q3nb-t8we-2hzv-a61c',
+      profile: { mixcloud: { on: false, key: '', url: '' }, youtube: { on: false, key: '', url: '' }, twitch: { on: true, key: 'live_19283_abXQ', url: '' } } },
+    { email: 'rin@relay.local', password: 'relaybox1234', role: 'user', ingestKey: null, profile: null }
+  ];
+}
+
+class Component extends DCLogic {
+  state = this.initial(this.props.startAt);
+
+  initial(startAt) {
+    const s = START[startAt ?? 'Admin, on air'] || 'admin';
+    const base = {
+      screen: 'setup', users: [], meEmail: null, active: null, stream: 'offline', bytes: 0, bitrate: 0,
+      sseDown: false, degraded: null, bannerHidden: false, expired: false, notice: null,
+      auth: { email: '', password: '', error: null, busy: false }, authReveal: false,
+      draft: blankDraft(), reveal: {}, advanced: false, formError: null, saveMsg: null, saveBusy: false,
+      panel: null, modal: null, actErr: null, firstRunKey: null, handoffs: {}, copied: false,
+      reg: { email: '', password: '', role: 'user', error: null, ok: null }, simOpen: true
+    };
+    if (s === 'first') return base;
+    const users = seedUsers();
+    if (s === 'login') return { ...base, users, active: 'ops@relay.local', screen: 'login' };
+    if (s === 'user') return { ...base, users, active: 'ops@relay.local', meEmail: 'sam@relay.local', screen: 'dashboard', stream: 'live', bitrate: 6120, bytes: 1.84e9 };
+    return { ...base, users, active: 'ops@relay.local', meEmail: 'ops@relay.local', screen: 'dashboard' };
+  }
+
+  componentDidMount() {
+    this.tick = setInterval(() => {
+      if (this.state.stream === 'live' && !this.state.sseDown) {
+        const br = Math.round(5800 + Math.random() * 600);
+        this.setState(s => ({ bitrate: br, bytes: s.bytes + br * 125 }));
+      }
+    }, 1000);
+  }
+  componentWillUnmount() { clearInterval(this.tick); clearTimeout(this.copyT); }
+  componentDidUpdate(prev) { if (prev.startAt !== this.props.startAt) this.setState(this.initial(this.props.startAt)); }
+
+  me() { return this.state.users.find(u => u.email === this.state.meEmail); }
+
+  guard(fn) {
+    return (...a) => {
+      if (this.state.expired) {
+        this.setState({ expired: false, meEmail: null, screen: 'login', panel: null, modal: null, notice: 'Your session expired — log in again.', auth: { email: '', password: '', error: null, busy: false } });
+        return;
+      }
+      fn(...a);
+    };
+  }
+
+  setUsers(fn) { this.setState(s => ({ users: s.users.map(u => fn(u) || u) })); }
+
+  submitAuth = e => {
+    e.preventDefault();
+    const { screen, auth, users } = this.state;
+    const email = auth.email.trim().toLowerCase();
+    if (screen === 'setup') {
+      if (!/^\S+@\S+\.\S+$/.test(email)) return this.setState({ auth: { ...auth, error: 'Enter a valid email address.' } });
+      if (auth.password.length < 12) return this.setState({ auth: { ...auth, error: 'Password needs at least 12 characters.' } });
+      if (users.some(u => u.email === email)) return this.setState({ auth: { ...auth, error: 'An account with that email already exists. Log in instead.' } });
+      this.setState({ auth: { ...auth, busy: true, error: null } });
+      setTimeout(() => this.setState({
+        users: [{ email, password: auth.password, role: 'admin', profile: null, ingestKey: null }],
+        meEmail: email, screen: 'firstrun', draft: blankDraft(), reveal: {}, formError: null, firstRunKey: null,
+        auth: { email: '', password: '', error: null, busy: false }
+      }), 500);
+      return;
+    }
+    const u = users.find(x => x.email === email);
+    if (!u || u.password !== auth.password) return this.setState({ auth: { ...auth, error: 'Email or password incorrect.' } });
+    this.loginAs(u.email);
+  };
+
+  loginAs = email => {
+    const u = this.state.users.find(x => x.email === email);
+    this.setState({
+      meEmail: email, screen: u.profile ? 'dashboard' : 'firstrun', notice: null, expired: false, panel: null, modal: null,
+      draft: u.profile ? clone(u.profile) : blankDraft(), reveal: {}, formError: null, saveMsg: null, firstRunKey: null, actErr: null,
+      auth: { email: '', password: '', error: null, busy: false }
+    });
+  };
+
+  saveProfile = this.guard(() => {
+    const { draft, degraded, screen, active } = this.state;
+    const on = META.filter(m => draft[m.id].on);
+    if (!on.length) return this.setState({ formError: 'Turn on at least one destination — with none, there is nothing to relay.', saveMsg: null });
+    const missing = on.filter(m => !draft[m.id].key.trim());
+    if (missing.length) return this.setState({ formError: `Add a stream key for ${missing.map(m => m.name).join(' and ')}, or turn it off.`, saveMsg: null });
+    this.setState({ saveBusy: true, formError: null, saveMsg: null });
+    setTimeout(() => {
+      if (this.state.degraded === 'mongo') return this.setState({ saveBusy: false, formError: "Couldn't save — the database is unreachable. Your changes are still here; try again in a moment." });
+      const me = this.me();
+      if (this.state.screen === 'firstrun') {
+        const key = genKey();
+        const becomesActive = !this.state.active;
+        this.setUsers(u => u.email === me.email ? { ...u, profile: clone(this.state.draft), ingestKey: key } : null);
+        this.setState({ saveBusy: false, firstRunKey: key, firstRunActivated: becomesActive, active: becomesActive ? me.email : this.state.active });
+      } else {
+        this.setUsers(u => u.email === me.email ? { ...u, profile: clone(this.state.draft) } : null);
+        this.setState({ saveBusy: false, saveMsg: `Saved at ${hhmm()}.` });
+      }
+    }, 600);
+  });
+
+  requestActivate(target) {
+    return this.guard(() => {
+      const { stream, active } = this.state;
+      if (active && active !== target && stream !== 'offline') return this.setState({ modal: { target } });
+      this.doActivate(target);
+    });
+  }
+
+  doActivate(target) {
+    const { active, stream, meEmail, degraded } = this.state;
+    if (degraded === 'mongo') return this.setState({ modal: null, actErr: "Couldn't activate — the database is unreachable. Nothing changed; try again in a moment." });
+    const handoffs = { ...this.state.handoffs };
+    if (active && active !== target) {
+      const who = target === meEmail ? `${target} activated their profile` : `${meEmail} activated ${target}`;
+      handoffs[active] = stream !== 'offline' ? `${who} at ${hhmm()} — your broadcast was ended. You're no longer the active profile.` : `${who} at ${hhmm()}. You're no longer the active profile.`;
+    }
+    if (target !== meEmail) handoffs[target] = `${meEmail} made you the active profile at ${hhmm()}. Start OBS whenever you're ready.`;
+    this.setState({ active: target, stream: 'offline', bytes: 0, bitrate: 0, modal: null, actErr: null, handoffs });
+  }
+
+  copyIngest = () => {
+    const me = this.me();
+    try { navigator.clipboard.writeText(HOST + me.ingestKey); } catch (e) {}
+    this.setState({ copied: true });
+    clearTimeout(this.copyT);
+    this.copyT = setTimeout(() => this.setState({ copied: false }), 1600);
+  };
+
+  setDraft(id, patch) { this.setState(s => ({ draft: { ...s.draft, [id]: { ...s.draft[id], ...patch } }, formError: null, saveMsg: null })); }
+
+  fault(kind) {
+    return () => this.setState(s => ({ degraded: kind, bannerHidden: false }));
+  }
+
+  renderVals() {
+    const s = this.state;
+    const me = this.me();
+    const authed = !!me && (s.screen === 'dashboard' || s.screen === 'firstrun');
+    const isSetup = s.screen === 'setup';
+    const isLogin = s.screen === 'login';
+    const isDash = authed && s.screen === 'dashboard';
+    const isFirstRun = authed && s.screen === 'firstrun' && !s.firstRunKey;
+    const isFirstRunDone = authed && s.screen === 'firstrun' && !!s.firstRunKey;
+    const isEdit = isDash && s.panel === 'edit';
+    const amActive = authed && s.active === me.email;
+    const isAdmin = authed && me.role === 'admin';
+    const otherLive = s.active && !amActive && s.stream !== 'offline';
+    const blockWhileLive = this.props.blockWhileLive ?? false;
+
+    const destRows = META.map(m => {
+      const d = s.draft[m.id];
+      const rev = !!s.reveal[m.id];
+      return {
+        id: m.id, name: m.name, on: d.on, off: !d.on, key: d.key, url: d.url, defaultUrl: m.url,
+        radioName: 'dest-' + m.id, inputType: rev ? 'text' : 'password', revealLabel: rev ? 'Hide' : 'Show',
+        placeholder: d.on ? `Paste your ${m.name} key` : 'Turned off',
+        setOn: () => this.setDraft(m.id, { on: true }), setOff: () => this.setDraft(m.id, { on: false }),
+        onKey: e => this.setDraft(m.id, { key: e.target.value }), onUrl: e => this.setDraft(m.id, { url: e.target.value }),
+        toggleReveal: () => this.setState(st => ({ reveal: { ...st.reveal, [m.id]: !st.reveal[m.id] } }))
+      };
+    });
+
+    const profileOn = me && me.profile ? META.filter(m => me.profile[m.id].on).map(m => m.name) : [];
+    const activeName = s.active ? (amActive ? 'You' : s.active) : 'No active profile';
+
+    let activeLine = 'No profile is active', activeSub = 'Activate a profile to open the relay.';
+    if (amActive) { activeLine = 'You are the active profile'; activeSub = s.stream === 'offline' ? 'Start OBS with the URL below and you go live.' : 'Your stream is what the relay is sending out.'; }
+    else if (s.active) { activeLine = `${s.active} is the active profile`; activeSub = otherLive ? 'They are broadcasting now. Activating your profile will end their broadcast.' : "They're not broadcasting. Activate your profile to take over the relay."; }
+
+    const offlineNote = amActive ? 'Nothing is arriving from OBS. Start streaming to the ingest URL below.' : s.active ? `${s.active} isn't streaming right now.` : 'No profile is active, so the relay is closed.';
+
+    const modalTarget = s.modal && s.modal.target;
+    const selfTarget = modalTarget === s.meEmail;
+    const modalCanConfirm = !!s.modal && !blockWhileLive;
+
+    const bannerMap = { nginx: 'Relay lost connection to the streaming engine — reconnecting.', mongo: "Can't reach the database — some actions won't work until this clears." };
+
+    const authCopy = isSetup
+      ? { k: 'First install', t: 'Set up this box.', l: 'Create the administrator account. You can add performers once you’re in.', b: 'Create admin account' }
+      : { k: 'Relay', t: 'Log in.', l: 'Check who’s on air, take over the relay, or update your stream keys.', b: 'Log in' };
+
+    const nonMe = s.users.filter(u => u.email !== s.meEmail);
+    const simGroups = [
+      { label: 'Stream (active profile’s OBS)', items: [
+        { label: 'Offline', run: () => this.setState({ stream: 'offline', sseDown: false, bytes: 0, bitrate: 0 }) },
+        { label: 'Live', run: () => this.setState(st => ({ stream: 'live', sseDown: false, bitrate: 6000, bytes: st.bytes || 2.4e8 })) },
+        { label: 'Idle', run: () => this.setState({ stream: 'idle', sseDown: false, bitrate: 0 }) },
+        { label: 'Drop browser SSE', run: () => this.setState({ sseDown: true }) }
+      ] },
+      { label: 'Faults', items: [
+        { label: 'Nginx crash', run: this.fault('nginx') },
+        { label: 'Mongo down', run: this.fault('mongo') },
+        { label: 'All clear', run: () => this.setState({ degraded: null, sseDown: false }) }
+      ] },
+      { label: 'Session', items: [
+        { label: 'Expire token (next click)', run: () => this.setState({ expired: true }) },
+        { label: 'Open /setup', run: () => this.setState(st => st.users.length ? { screen: 'login', meEmail: null, notice: 'Setup is already complete — log in.' } : { screen: 'setup' }) },
+        { label: 'Reset to first install', run: () => this.setState(this.initial('First install')) }
+      ] },
+      { label: 'Log in as', items: nonMe.map(u => ({ label: u.email.split('@')[0] + (u.role === 'admin' ? ' (admin)' : ''), run: () => this.loginAs(u.email) })) }
+    ].filter(g => g.items.length);
+
+    return {
+      authed, unauthed: !authed, meEmail: s.meEmail, meRole: me ? me.role : '', amActive, notActive: authed && !amActive,
+      showBanner: authed && !!s.degraded && !s.bannerHidden, bannerText: bannerMap[s.degraded] || '',
+      dismissBanner: () => this.setState({ bannerHidden: true }),
+      logout: () => this.setState({ meEmail: null, screen: 'login', panel: null, modal: null, notice: null, expired: false }),
+
+      isAuthScreen: !authed && (isSetup || isLogin), isSetup, notice: s.notice,
+      authKicker: authCopy.k, authTitle: authCopy.t, authLede: authCopy.l, authSubmitLabel: s.auth.busy ? 'Creating…' : authCopy.b,
+      authEmail: s.auth.email, authPassword: s.auth.password, authError: s.auth.error, authBusy: s.auth.busy,
+      authPwType: s.authReveal ? 'text' : 'password', authRevealLabel: s.authReveal ? 'Hide' : 'Show',
+      toggleAuthReveal: () => this.setState(st => ({ authReveal: !st.authReveal })),
+      onAuthEmail: e => this.setState({ auth: { ...s.auth, email: e.target.value, error: null } }),
+      onAuthPassword: e => this.setState({ auth: { ...s.auth, password: e.target.value, error: null } }),
+      submitAuth: this.submitAuth,
+
+      showProfileForm: isFirstRun || isEdit, isEdit,
+      formKicker: isEdit ? 'Your profile' : 'Step 2 of 2 · first run',
+      formTitle: isEdit ? 'Edit destinations' : 'Where should your stream go?',
+      formLede: isEdit ? 'Changes apply the next time you start streaming.' : (s.active ? `Your profile won't become active on its own — ${s.active} is active. You can take over from the dashboard.` : 'Nobody is broadcasting yet, so this profile becomes the active one when you save.'),
+      destRows, advanced: s.advanced, advancedLabel: s.advanced ? 'Hide advanced' : 'Advanced: custom ingest URLs',
+      toggleAdvanced: () => this.setState(st => ({ advanced: !st.advanced })),
+      formError: s.formError, saveMsg: s.saveMsg, saveBusy: s.saveBusy,
+      saveLabel: s.saveBusy ? 'Saving…' : isEdit ? 'Save changes' : 'Save and get OBS URL',
+      saveProfile: this.saveProfile, closePanel: () => this.setState({ panel: null, formError: null, saveMsg: null }),
+
+      isFirstRunDone, ingestUrl: me && me.ingestKey ? HOST + me.ingestKey : '',
+      firstRunDoneNote: s.firstRunActivated ? 'Your profile is active. Paste this into OBS and start streaming — the dashboard shows the moment it goes live.' : `This is your personal ingest URL. It only works while your profile is active — right now that's ${s.active}.`,
+      copyIngest: this.copyIngest, copyLabel: s.copied ? 'Copied' : 'Copy URL',
+      goDashboard: this.guard(() => this.setState({ screen: 'dashboard', firstRunKey: null })),
+
+      isDash, handoffMsg: authed ? s.handoffs[s.meEmail] || null : null,
+      clearHandoff: () => this.setState(st => { const h = { ...st.handoffs }; delete h[st.meEmail]; return { handoffs: h }; }),
+      sUnknown: s.sseDown, sLive: !s.sseDown && s.stream === 'live', sIdle: !s.sseDown && s.stream === 'idle', sOffline: !s.sseDown && s.stream === 'offline',
+      activeName, bitrateText: (s.bitrate / 1000).toFixed(1) + ' Mbps', bytesText: (s.bytes / 1e9).toFixed(2) + ' GB', offlineNote,
+      activeLine, activeSub, canActivateSelf: isDash && !amActive && !!me.profile, activateSelf: me ? this.requestActivate(me.email) : null, actErr: s.actErr,
+      destSummary: profileOn.length ? 'Sending to ' + profileOn.join(', ') : 'No destinations on',
+      openEdit: this.guard(() => this.setState({ panel: 'edit', draft: clone(me.profile), reveal: {}, formError: null, saveMsg: null })),
+      isAdmin, openRegister: this.guard(() => this.setState({ panel: 'register', reg: { email: '', password: '', role: 'user', error: null, ok: null } })),
+      showRegister: isDash && isAdmin && s.panel === 'register',
+      regEmail: s.reg.email, regPassword: s.reg.password, regIsUser: s.reg.role === 'user', regIsAdmin: s.reg.role === 'admin', regError: s.reg.error, regOk: s.reg.ok,
+      onRegEmail: e => this.setState({ reg: { ...s.reg, email: e.target.value, error: null, ok: null } }),
+      onRegPassword: e => this.setState({ reg: { ...s.reg, password: e.target.value, error: null, ok: null } }),
+      setRegUser: () => this.setState({ reg: { ...s.reg, role: 'user' } }), setRegAdmin: () => this.setState({ reg: { ...s.reg, role: 'admin' } }),
+      submitRegister: e => { e.preventDefault(); this.guard(() => {
+        const r = this.state.reg; const email = r.email.trim().toLowerCase();
+        if (!/^\S+@\S+\.\S+$/.test(email)) return this.setState({ reg: { ...r, error: 'Enter a valid email address.' } });
+        if (r.password.length < 12) return this.setState({ reg: { ...r, error: 'Password needs at least 12 characters.' } });
+        if (this.state.users.some(u => u.email === email)) return this.setState({ reg: { ...r, error: 'An account with that email already exists.' } });
+        if (this.state.degraded === 'mongo') return this.setState({ reg: { ...r, error: "Couldn't create the account — the database is unreachable. Try again in a moment." } });
+        this.setState(st => ({ users: [...st.users, { email, password: r.password, role: r.role, profile: null, ingestKey: null }], reg: { email: '', password: '', role: 'user', error: null, ok: `Created ${email} (${r.role}). They'll set up their destinations the first time they log in.` } }));
+      })(); },
+      userRows: s.users.map(u => ({
+        email: u.email + (u.email === s.meEmail ? ' (you)' : ''), role: u.role, profileText: u.profile ? 'Set up' : 'Not set up yet',
+        isActive: s.active === u.email, statusText: s.active === u.email ? (s.stream === 'live' ? 'Active · live' : s.stream === 'idle' ? 'Active · idle' : 'Active') : '',
+        canActivate: !!u.profile && s.active !== u.email, onActivate: this.requestActivate(u.email)
+      })),
+
+      modalOpen: !!s.modal, stop: e => e.stopPropagation(),
+      modalKicker: blockWhileLive ? 'Activation blocked' : 'This will end a live broadcast',
+      modalTitle: `${s.active} is live right now`,
+      modalBody: blockWhileLive
+        ? `You can't activate ${selfTarget ? 'your profile' : modalTarget} while someone is broadcasting. Ask ${s.active} to stop OBS, then try again.`
+        : `Activating ${selfTarget ? 'your profile' : modalTarget} cuts their stream immediately on every destination. They'll see that you took over.`,
+      modalCanConfirm, cancelLabel: blockWhileLive ? 'OK' : 'Cancel', confirmLabel: selfTarget ? 'End theirs, activate mine' : `End theirs, activate ${(modalTarget || '').split('@')[0]}`,
+      closeModal: () => this.setState({ modal: null }), confirmModal: () => this.doActivate(modalTarget),
+
+      showSim: this.props.showSimulator ?? true, simOpen: s.simOpen, simToggleLabel: s.simOpen ? '–' : '+',
+      toggleSim: () => this.setState(st => ({ simOpen: !st.simOpen })), simGroups
+    };
+  }
+}
+</script>
+</body>
+</html>
