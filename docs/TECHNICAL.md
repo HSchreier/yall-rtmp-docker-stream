@@ -287,9 +287,15 @@ Modeled directly on Stagebox's own three-pronged setup (`docs/CI_CD.md §2.3` th
 
 ### CI/CD pipeline
 
-Single deployable, so a simpler shape than Stagebox's multi-branch model — feature branches straight to `main`, no intermediate `staging` tier, since there's only one thing here to integrate.
+```
+feature/<name> ──PR──▶ staging ──PR──▶ main
+```
 
-**On every PR:**
+Two tiers, not Stagebox's three (`feature → deployable → staging → main`) — there's only one deployable here, so the middle tier doesn't exist. `staging` is still the integration branch and is expected to stay green; `main` receives only deliberate merges from it, same spirit as Stagebox even though the branch count differs.
+
+> Note: an earlier version of this doc argued explicitly *against* a staging tier ("no intermediate staging tier, since there's only one thing here to integrate") — reversed. A single deployable was never really the reason to skip it; `staging` earns its place as the place PRs land and CI runs before anything reaches `main`, independent of how many deployables there are.
+
+**On every PR (into `staging`):**
 
 1. **Security suite** (above) — gitleaks, Semgrep, Spectral (`bunx @stoplight/spectral-cli lint openapi.yaml`, default `oas` ruleset now, the project-specific security-block rule once it's written) — runs first, before anything else touches the code.
 2. **Spec sync** — `bun scripts/check-spec-sync.ts`. Zero dependencies, checked in and actually runs today (unlike everything below it, which needs application code that doesn't exist yet): diffs `openapi.yaml`'s paths against this doc's own HTTP payload table and fails on anything present in one but not the other, with an explicit allowlist for the known, intentional asymmetries (static HTML pages aren't in `openapi.yaml`; the internal nginx-notify routes aren't in this table). This is the "second source of truth" claim actually enforced, not just asserted in prose — verified by deliberately breaking it once (renamed a path in `openapi.yaml`, confirmed the script caught it and named both sides correctly) before trusting it.
@@ -302,10 +308,10 @@ Single deployable, so a simpler shape than Stagebox's multi-branch model — fea
 9. **Spec coverage** (once application code exists — not built yet, `check-spec-sync.ts` above only checks the two *documents* against each other): mirrors Stagebox's own `check-spec-coverage.ts` — fails if any `openapi.yaml` path has no route handler, or any route handler isn't in `openapi.yaml`. This is the piece that would catch code drifting from the spec; nothing does that yet because there's no code to drift.
 10. **Contract tests** (also pending code): the integration suite's `ffmpeg`-driven checks should assert actual HTTP responses match `openapi.yaml`'s schemas, not just that the design intends them to — e.g. via `openapi-response-validator` or an equivalent, run against real `/health`/`/stats`/`/profile` responses once they exist.
 
-**On merge to `main`:**
+**On `staging → main` (the same checks above run again — no separate Main CI shape yet, unlike Stagebox's, since there's no docs-only fast path to speed up here):**
 
-8. Build and push the image to a registry (GHCR: `ghcr.io/hschreier/yall-rtmp-docker-stream`), tagged with the commit SHA and `:latest`.
-9. Actual deployment stays manual for v1 — there's one instance, redeployed by hand when needed. Not automating a deploy target that doesn't exist yet.
+11. Build and push the image to a registry (GHCR: `ghcr.io/hschreier/yall-rtmp-docker-stream`), tagged with the commit SHA and `:latest`.
+12. Actual deployment stays manual for v1 — there's one instance, redeployed by hand when needed. Not automating a deploy target that doesn't exist yet.
 
 ## Explicitly not doing
 
