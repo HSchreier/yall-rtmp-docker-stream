@@ -1,0 +1,9 @@
+Ya'll Cast palette
+Signal red  #D52B1E
+Film yellow #F4B41A
+Ink         #1A1410
+Orange      #EE7A1C
+Cream       #F6EEDC
+
+Wordmark: Archivo (wdth 125, wght 900), outlined in SVGs. Tagline: IBM Plex Mono 500.
+GitHub: mark-512.png as org/repo avatar; social-preview-1280x640.png under Settings > Social preview.
