@@ -48,7 +48,11 @@ export class DestinationProfileRepository {
   }
 
   async get(userId: string): Promise<DestinationProfileDoc | null> {
-    return this.#collection.findOne({ userId });
+    // Project _id out — it's Mongo's own internal id, not part of the
+    // documented Profile shape in openapi.yaml, and leaking it in an API
+    // response is exactly the kind of thing that's easy to miss without
+    // actually testing the response, not just the type signature.
+    return this.#collection.findOne({ userId }, { projection: { _id: 0 } });
   }
 
   async exists(userId: string): Promise<boolean> {
