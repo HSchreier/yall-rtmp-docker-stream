@@ -79,13 +79,14 @@ export async function bootstrap(): Promise<App> {
   // touch on an incoming request is already up.
   const httpApi = new HttpApi({
     auth,
+    users,
     destinationProfiles,
     relayState,
     mongo,
     logger,
     httpPort: config.get().httpPort,
   });
-  httpApi.init();
+  await httpApi.init();
 
   return {
     logger,

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Set up — Ya'll Cast</title>
+<link rel="stylesheet" href="/modernist.css" />
+<link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+<header class="nav">
+  <span class="nav-brand">Ya'll Cast</span>
+  <span class="text-muted">Stream relay · this box</span>
+</header>
+<main class="page">
+  <div class="hero-grid">
+    <div>
+      <p class="card-kicker">First install</p>
+      <h1>Set up this box.</h1>
+      <p class="text-muted">Create the administrator account. You can add performers once you're in.</p>
+    </div>
+    <div>
+      <form id="setup-form">
+        <div class="field">
+          <label for="email">Email</label>
+          <input class="input" id="email" name="email" type="email" required />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input class="input" id="password" name="password" type="password" minlength="12" required />
+          <p class="text-muted" style="font-size:12px;margin-top:4px">
+            At least 12 characters. This account will be the box's administrator.
+          </p>
+        </div>
+        <p class="error-text" role="alert" hidden></p>
+        <button class="btn btn-primary btn-block" type="submit">Create admin account</button>
+      </form>
+    </div>
+  </div>
+</main>
+<script src="/app.js"></script>
+<script>
+  Yallcast.bindForm("#setup-form", async (data) => {
+    const res = await Yallcast.api("POST", "/auth/register", data);
+    if (res.ok) {
+      // /auth/register doesn't establish a session (it's also how an admin
+      // creates *other* accounts, which must not log the admin out) — so
+      // the bootstrap case logs in immediately after, same credentials,
+      // to actually land on the dashboard authenticated instead of
+      // bouncing back to login.
+      const login = await Yallcast.api("POST", "/auth/login", data);
+      if (login.ok) {
+        location.href = "/dashboard.html";
+        return login;
+      }
+      location.href = "/login.html";
+    }
+    return res;
+  });
+</script>
+</body>
+</html>
