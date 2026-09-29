@@ -5,7 +5,7 @@
 // of an assumption every caller has to uphold.
 
 import type { Collection, Db } from "mongodb";
-import type { EventBus } from "./event-bus.ts";
+import type { EventBus } from "../../infra/event-bus.ts";
 
 interface RelayStateDoc {
   _id: "singleton";
@@ -29,7 +29,7 @@ export class RelayStateRepository {
     return doc?.activeUserId ?? null;
   }
 
-  async setActive(userId: string, activatedBy: string): Promise<void> {
+  async setActive(userId: string, activatedBy: string): Promise<Date> {
     const activatedAt = new Date();
     // No `_id` in the replacement document — the driver's typings exclude it
     // from a replace payload, and it isn't needed: on upsert, Mongo assigns
@@ -41,5 +41,9 @@ export class RelayStateRepository {
       { upsert: true },
     );
     this.eventBus.emit("ActiveProfileChanged", { userId, activatedBy, at: activatedAt });
+    // Returned so callers (UsersService/ProfileService) report the exact
+    // timestamp that was actually persisted and emitted, instead of taking
+    // a second `new Date()` that could drift from it by a few ms.
+    return activatedAt;
   }
 }

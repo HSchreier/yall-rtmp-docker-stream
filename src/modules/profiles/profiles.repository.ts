@@ -6,8 +6,8 @@
 
 import { randomBytes } from "node:crypto";
 import type { Collection, Db } from "mongodb";
-import type { EventBus } from "./event-bus.ts";
-import type { Destination } from "./events.ts";
+import type { EventBus } from "../../infra/event-bus.ts";
+import type { Destination } from "../../infra/events.ts";
 
 export interface DestinationEntry {
   enabled: boolean;

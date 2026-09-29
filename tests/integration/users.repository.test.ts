@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { Logger } from "../../src/logger.ts";
-import { MongoService } from "../../src/mongo-service.ts";
-import { UserRepository } from "../../src/user-repository.ts";
+import { Logger } from "../../src/infra/logger.ts";
+import { MongoService } from "../../src/infra/mongo-service.ts";
+import { UserRepository } from "../../src/modules/users/users.repository.ts";
 
 const uri = process.env.MONGO_TEST_URI ?? "mongodb://localhost:27117/user-repository-test";
 

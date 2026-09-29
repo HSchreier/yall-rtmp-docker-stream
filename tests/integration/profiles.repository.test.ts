@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { DestinationProfileRepository } from "../../src/destination-profile-repository.ts";
-import { EventBus } from "../../src/event-bus.ts";
-import type { DestinationCredentialsUpdated } from "../../src/events.ts";
-import { Logger } from "../../src/logger.ts";
-import { MongoService } from "../../src/mongo-service.ts";
+import { EventBus } from "../../src/infra/event-bus.ts";
+import type { DestinationCredentialsUpdated } from "../../src/infra/events.ts";
+import { Logger } from "../../src/infra/logger.ts";
+import { MongoService } from "../../src/infra/mongo-service.ts";
+import { DestinationProfileRepository } from "../../src/modules/profiles/profiles.repository.ts";
 
 const uri =
   process.env.MONGO_TEST_URI ?? "mongodb://localhost:27117/destination-profile-repository-test";

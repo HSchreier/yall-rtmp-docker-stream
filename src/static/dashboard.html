@@ -137,6 +137,31 @@
   </div>
 </main>
 
+<!-- View templates — see /template.js. Row markup lives here, not as
+     string concatenation in the script block below. -->
+<template id="user-row-template">
+  <tr>
+    <td><span data-field="email"></span> <span class="text-muted" data-when="isYou">(you)</span></td>
+    <td data-field="role"></td>
+    <td data-field="profileText"></td>
+    <td>
+      <span class="tag tag-accent" data-when="isActive">Active</span>
+      <span class="text-muted" data-unless="isActive">—</span>
+    </td>
+    <td>
+      <button type="button" class="btn btn-secondary" data-when="showActivate" data-bind="data-activate-user:userId">Activate</button>
+    </td>
+  </tr>
+</template>
+
+<template id="endpoint-row-template">
+  <tr>
+    <th data-field="label"></th>
+    <td><code data-field="value"></code> <span class="text-muted" data-when="note" data-field="note"></span></td>
+  </tr>
+</template>
+
+<script src="/template.js"></script>
 <script src="/app.js"></script>
 <script>
   let session = null;
@@ -150,32 +175,25 @@
   };
   const RTMP_PORT = 1935;
 
-  function endpointRow(label, value, note) {
-    return `<tr><th>${label}</th><td><code>${value}</code>${note ? ` <span class="text-muted">${note}</span>` : ""}</td></tr>`;
-  }
-
   async function renderEndpoints(profile) {
     const health = await Yallcast.api("GET", "/health");
-    const rows = [];
-
-    rows.push(
-      endpointRow(
-        "This dashboard / HTTP API",
-        `${location.protocol}//${location.host}`,
-        "the control API you're using right now",
-      ),
-    );
+    const rows = [
+      {
+        label: "This dashboard / HTTP API",
+        value: `${location.protocol}//${location.host}`,
+        note: "the control API you're using right now",
+      },
+    ];
 
     if (profile) {
-      rows.push(
-        endpointRow(
-          "OBS ingest (RTMP)",
-          `rtmp://${location.hostname}:${RTMP_PORT}/ingest/${profile.ingestStreamKey}`,
+      rows.push({
+        label: "OBS ingest (RTMP)",
+        value: `rtmp://${location.hostname}:${RTMP_PORT}/ingest/${profile.ingestStreamKey}`,
+        note:
           health.ok && !health.data.nginxReachable
             ? "— not live yet, nginx/RTMP isn't built/running in this dev build"
             : "",
-        ),
-      );
+      });
     }
 
     for (const dest of ["mixcloud", "youtube", "twitch"]) {
@@ -183,16 +201,14 @@
       const base = entry?.customIngestUrl || DEFAULT_DESTINATION_URLS[dest];
       const target = entry?.enabled && entry?.streamKey ? `${base}/${entry.streamKey}` : base;
       const label = dest.charAt(0).toUpperCase() + dest.slice(1);
-      rows.push(
-        endpointRow(
-          `→ ${label}`,
-          target,
-          entry?.enabled ? "" : "off — no push line rendered for this one",
-        ),
-      );
+      rows.push({
+        label: `→ ${label}`,
+        value: target,
+        note: entry?.enabled ? "" : "off — no push line rendered for this one",
+      });
     }
 
-    document.getElementById("endpoints-table").innerHTML = rows.join("");
+    Template.renderInto(document.getElementById("endpoints-table"), "endpoint-row-template", rows);
     document.getElementById("endpoints-note").textContent = health.ok
       ? `mongoReachable: ${health.data.mongoReachable} · nginxReachable: ${health.data.nginxReachable} · ingestStatus: ${health.data.ingestStatus}`
       : "Couldn't reach /health.";
@@ -325,21 +341,19 @@
   async function loadUsersTable() {
     const res = await Yallcast.api("GET", "/users");
     if (!res.ok) return;
-    const tbody = document.getElementById("users-table-body");
-    tbody.innerHTML = res.data.users
-      .map((u) => {
-        const you = u.userId === session?.userId ? " <span class=\"text-muted\">(you)</span>" : "";
-        const profileText = u.hasProfile ? "Set up" : "Not set up yet";
-        const statusTag = u.isActive
-          ? '<span class="tag tag-accent">Active</span>'
-          : '<span class="text-muted">—</span>';
-        const action =
-          u.hasProfile && !u.isActive
-            ? `<button type="button" class="btn btn-secondary" data-activate-user="${u.userId}">Activate</button>`
-            : "";
-        return `<tr><td>${u.email}${you}</td><td>${u.role}</td><td>${profileText}</td><td>${statusTag}</td><td>${action}</td></tr>`;
-      })
-      .join("");
+    // The fetch here only fetches; the view (row markup, what "you"/
+    // "Active"/"Activate" mean visually) lives in #user-row-template —
+    // this just maps API fields onto the flags the template binds against.
+    const rows = res.data.users.map((u) => ({
+      userId: u.userId,
+      email: u.email,
+      role: u.role,
+      isYou: u.userId === session?.userId,
+      profileText: u.hasProfile ? "Set up" : "Not set up yet",
+      isActive: u.isActive,
+      showActivate: u.hasProfile && !u.isActive,
+    }));
+    Template.renderInto(document.getElementById("users-table-body"), "user-row-template", rows);
   }
 
   document.getElementById("users-table-body").addEventListener("click", async (event) => {

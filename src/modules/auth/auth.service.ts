@@ -13,10 +13,10 @@
 // test today; needs closing before anything resembling real deployment.
 
 import jwt from "jsonwebtoken";
-import { AuthError, ConflictError, ForbiddenError, ValidationError } from "./errors.ts";
-import type { EventBus } from "./event-bus.ts";
-import type { Role } from "./events.ts";
-import type { UserRepository } from "./user-repository.ts";
+import { AuthError, ConflictError, ForbiddenError, ValidationError } from "../../infra/errors.ts";
+import type { EventBus } from "../../infra/event-bus.ts";
+import type { Role } from "../../infra/events.ts";
+import type { UserRepository } from "../users/users.repository.ts";
 
 const MIN_PASSWORD_LENGTH = 12;
 // JWT lifetime is an open question in docs/TECHNICAL.md — 12h picked as a

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { ConfigService } from "../../src/config-service.ts";
-import { Logger } from "../../src/logger.ts";
+import { ConfigService } from "../../src/infra/config-service.ts";
+import { Logger } from "../../src/infra/logger.ts";
 
 const ENV_KEYS = ["MONGO_URI", "JWT_SECRET", "HTTP_PORT"] as const;
 let saved: Record<string, string | undefined>;

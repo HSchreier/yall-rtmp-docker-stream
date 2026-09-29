@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { EventBus } from "../../src/event-bus.ts";
-import type { ActiveProfileChanged } from "../../src/events.ts";
-import { Logger } from "../../src/logger.ts";
-import { MongoService } from "../../src/mongo-service.ts";
-import { RelayStateRepository } from "../../src/relay-state-repository.ts";
+import { EventBus } from "../../src/infra/event-bus.ts";
+import type { ActiveProfileChanged } from "../../src/infra/events.ts";
+import { Logger } from "../../src/infra/logger.ts";
+import { MongoService } from "../../src/infra/mongo-service.ts";
+import { RelayStateRepository } from "../../src/modules/relay/relay.repository.ts";
 
 const uri = process.env.MONGO_TEST_URI ?? "mongodb://localhost:27117/relay-state-repository-test";
 

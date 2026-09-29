@@ -15,7 +15,7 @@
 
 import type { Collection, Db } from "mongodb";
 import { ObjectId } from "mongodb";
-import type { Role } from "./events.ts";
+import type { Role } from "../../infra/events.ts";
 
 export interface UserDoc {
   userId: string;
