@@ -16,13 +16,12 @@ import jwt from "jsonwebtoken";
 import { AuthError, ConflictError, ForbiddenError, ValidationError } from "../../infra/errors.ts";
 import type { EventBus } from "../../infra/event-bus.ts";
 import type { Role } from "../../infra/events.ts";
+import { EMAIL_RE, MIN_PASSWORD_LENGTH } from "../../infra/validators.ts";
 import type { UserRepository } from "../users/users.repository.ts";
 
-const MIN_PASSWORD_LENGTH = 12;
 // JWT lifetime is an open question in docs/TECHNICAL.md — 12h picked as a
 // reasonable default for an internal tool, not derived from anything.
 const TOKEN_TTL_SECONDS = 60 * 60 * 12;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export interface JwtPayload {
   userId: string;

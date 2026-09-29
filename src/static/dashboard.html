@@ -137,6 +137,51 @@
   </div>
 </main>
 
+<!-- Edit user dialog -->
+<div class="dialog-backdrop" id="edit-user-backdrop" hidden>
+  <div class="dialog">
+    <h3 class="dialog-title">Edit account</h3>
+    <form id="edit-user-form">
+      <div class="field">
+        <label for="edit-email">Email</label>
+        <input class="input" id="edit-email" name="email" type="email" required />
+      </div>
+      <fieldset class="field" style="border:0;padding:0;margin:0">
+        <legend style="font-size:12px;margin-bottom:5px;color:color-mix(in srgb, var(--color-text) 70%, transparent)">Role</legend>
+        <div class="seg">
+          <label class="seg-opt"><input type="radio" name="role" value="user" /> User</label>
+          <label class="seg-opt"><input type="radio" name="role" value="admin" /> Admin</label>
+        </div>
+      </fieldset>
+      <div class="field">
+        <label for="edit-password">New password <span class="text-muted">(leave blank to keep unchanged)</span></label>
+        <input class="input" id="edit-password" name="password" type="password" minlength="12" />
+      </div>
+      <p class="error-text" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-secondary" id="edit-user-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Remove user confirmation dialog -->
+<div class="dialog-backdrop" id="remove-user-backdrop" hidden>
+  <div class="dialog">
+    <h3 class="dialog-title">Remove account</h3>
+    <p class="dialog-body">
+      Permanently delete <strong id="remove-user-email"></strong>? Their destination profile
+      (if any) is deleted with it. This can't be undone.
+    </p>
+    <p class="error-text" role="alert" hidden></p>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-secondary" id="remove-user-cancel">Cancel</button>
+      <button type="button" class="btn btn-primary" id="remove-user-confirm">Remove</button>
+    </div>
+  </div>
+</div>
+
 <!-- View templates — see /template.js. Row markup lives here, not as
      string concatenation in the script block below. -->
 <template id="user-row-template">
@@ -148,8 +193,10 @@
       <span class="tag tag-accent" data-when="isActive">Active</span>
       <span class="text-muted" data-unless="isActive">—</span>
     </td>
-    <td>
+    <td class="action-buttons">
       <button type="button" class="btn btn-secondary" data-when="showActivate" data-bind="data-activate-user:userId">Activate</button>
+      <button type="button" class="btn btn-secondary" data-bind="data-edit-user:userId data-edit-email:email data-edit-role:role">Edit</button>
+      <button type="button" class="btn btn-secondary" data-bind="data-remove-user:userId data-remove-email:email">Remove</button>
     </td>
   </tr>
 </template>
@@ -357,10 +404,82 @@
   }
 
   document.getElementById("users-table-body").addEventListener("click", async (event) => {
-    const userId = event.target?.dataset?.activateUser;
-    if (!userId) return;
-    await Yallcast.api("POST", `/users/${encodeURIComponent(userId)}/activate`);
-    location.reload();
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    if (target.dataset.activateUser) {
+      await Yallcast.api("POST", `/users/${encodeURIComponent(target.dataset.activateUser)}/activate`);
+      location.reload();
+      return;
+    }
+
+    if (target.dataset.editUser) {
+      openEditUserDialog(target.dataset.editUser, target.dataset.editEmail, target.dataset.editRole);
+      return;
+    }
+
+    if (target.dataset.removeUser) {
+      openRemoveUserDialog(target.dataset.removeUser, target.dataset.removeEmail);
+    }
+  });
+
+  // — Edit user dialog —
+  let editingUserId = null;
+
+  function openEditUserDialog(userId, email, role) {
+    editingUserId = userId;
+    const form = document.getElementById("edit-user-form");
+    form.reset();
+    form.elements.email.value = email;
+    for (const radio of form.elements.role) radio.checked = radio.value === role;
+    document.getElementById("edit-user-backdrop").hidden = false;
+  }
+
+  function closeEditUserDialog() {
+    document.getElementById("edit-user-backdrop").hidden = true;
+    editingUserId = null;
+  }
+
+  document.getElementById("edit-user-cancel").addEventListener("click", closeEditUserDialog);
+
+  Yallcast.bindForm("#edit-user-form", async (data) => {
+    const res = await Yallcast.api("PATCH", `/users/${encodeURIComponent(editingUserId)}`, data);
+    if (res.ok) {
+      closeEditUserDialog();
+      await loadUsersTable();
+    }
+    return res;
+  });
+
+  // — Remove user dialog —
+  let removingUserId = null;
+
+  function openRemoveUserDialog(userId, email) {
+    removingUserId = userId;
+    document.getElementById("remove-user-email").textContent = email;
+    const errorEl = document.querySelector("#remove-user-backdrop .error-text");
+    errorEl.hidden = true;
+    errorEl.textContent = "";
+    document.getElementById("remove-user-backdrop").hidden = false;
+  }
+
+  function closeRemoveUserDialog() {
+    document.getElementById("remove-user-backdrop").hidden = true;
+    removingUserId = null;
+  }
+
+  document.getElementById("remove-user-cancel").addEventListener("click", closeRemoveUserDialog);
+
+  document.getElementById("remove-user-confirm").addEventListener("click", async () => {
+    const res = await Yallcast.api("DELETE", `/users/${encodeURIComponent(removingUserId)}`);
+    if (res.ok) {
+      closeRemoveUserDialog();
+      await loadUsersTable();
+    } else {
+      const errorEl = document.querySelector("#remove-user-backdrop .error-text");
+      errorEl.textContent = res.data?.error?.message ?? "Something went wrong.";
+      errorEl.hidden = false;
+    }
   });
 
   init();

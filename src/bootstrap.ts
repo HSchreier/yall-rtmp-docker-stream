@@ -89,7 +89,7 @@ export async function bootstrap(): Promise<App> {
   // repository — UsersService (list-with-status, admin activation) and
   // ProfileService (own-profile activation). Routers below talk only to
   // these, never to a repository directly.
-  const usersService = new UsersService(users, destinationProfiles, relayState);
+  const usersService = new UsersService(users, destinationProfiles, relayState, eventBus);
   const profileService = new ProfileService(destinationProfiles, relayState);
 
   // Step 5: module routers — each owns its own routes and its own service.

@@ -232,6 +232,109 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /users/{userId}:
+    patch:
+      operationId: updateUser
+      tags: [profile]
+      summary: Admin-only — change another account's email, role, and/or password.
+      description: |
+        At least one of email/role/password required. Demoting the last remaining
+        admin to role "user" is rejected with 409 — see docs/TECHNICAL.md, Security
+        invariants. Password, if provided, is hashed the same way as at registration
+        (Bun.password); the plaintext is never persisted or logged.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: The updated account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListEntry'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthError'
+        '403':
+          description: Valid session, but not an admin.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No such user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email already taken, or this edit would leave zero admin accounts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      operationId: deleteUser
+      tags: [profile]
+      summary: Admin-only — permanently remove an account.
+      description: |
+        Cascades: the account's destination_profiles document (if any) is deleted
+        with it — an orphaned profile still holding a working ingestStreamKey has
+        no owner left to consent to its continued existence. Rejected with 409 if
+        the target is the last remaining admin, or is the currently active
+        broadcaster (deactivate, or activate someone else, first) — see
+        docs/TECHNICAL.md, Security invariants.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Account deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteUserResponse'
+        '401':
+          $ref: '#/components/responses/AuthError'
+        '403':
+          description: Valid session, but not an admin.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No such user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Target is the last admin, or the currently active broadcaster.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /users/{userId}/activate:
     post:
       operationId: activateUserProfile
@@ -463,6 +566,23 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UserListEntry'
+
+    UpdateUserRequest:
+      type: object
+      description: At least one field required.
+      properties:
+        email: { type: string, format: email }
+        role: { type: string, enum: [user, admin] }
+        password:
+          type: string
+          description: 12+ characters. Hashed the same way as at registration; never persisted or logged as plaintext.
+
+    DeleteUserResponse:
+      type: object
+      required: [userId, deleted]
+      properties:
+        userId: { type: string }
+        deleted: { type: boolean }
 
     DestinationEntry:
       type: object

@@ -108,6 +108,12 @@ export class DestinationProfileRepository {
     return count > 0;
   }
 
+  // Cascade target when a user account is deleted — see UsersService.deleteUser().
+  // A no-op, not an error, if the user never set up a profile.
+  async delete(userId: string): Promise<void> {
+    await this.#collection.deleteOne({ userId });
+  }
+
   async upsert(
     userId: string,
     update: DestinationProfileUpdate,

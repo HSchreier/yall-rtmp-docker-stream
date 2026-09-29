@@ -1,13 +1,15 @@
-// UsersRouter — translates HTTP <-> UsersService only. Owns /users and
-// /users/:userId/activate (both admin-only). No orchestration happens
-// here — UsersService.listWithStatus()/activateFor() own that.
+// UsersRouter — translates HTTP <-> UsersService only. Owns /users,
+// /users/:userId/activate, /users/:userId (PATCH/DELETE) — all admin-only.
+// No orchestration happens here — UsersService owns every decision about
+// what's safe to change or remove.
 
-import { jsonResponse } from "../../infra/http.ts";
+import { jsonResponse, readJson } from "../../infra/http.ts";
 import { requireAuth } from "../../infra/http-session.ts";
 import type { AuthService } from "../auth/auth.service.ts";
-import type { UsersService } from "./users.service.ts";
+import type { UserPatch, UsersService } from "./users.service.ts";
 
 const ACTIVATE_USER_RE = /^\/users\/([^/]+)\/activate$/;
+const USER_RE = /^\/users\/([^/]+)$/;
 
 export class UsersRouter {
   constructor(
@@ -25,12 +27,28 @@ export class UsersRouter {
       return jsonResponse(200, { users });
     }
 
-    const targetUserId = pathname.match(ACTIVATE_USER_RE)?.[1];
-    if (targetUserId && req.method === "POST") {
+    const activateTargetId = pathname.match(ACTIVATE_USER_RE)?.[1];
+    if (activateTargetId && req.method === "POST") {
       const session = requireAuth(req, this.auth);
       this.auth.requireAdmin(session);
-      const result = await this.usersService.activateFor(targetUserId, session.userId);
+      const result = await this.usersService.activateFor(activateTargetId, session.userId);
       return jsonResponse(200, result);
+    }
+
+    const targetUserId = pathname.match(USER_RE)?.[1];
+    if (targetUserId && req.method === "PATCH") {
+      const session = requireAuth(req, this.auth);
+      this.auth.requireAdmin(session);
+      const body = await readJson<UserPatch>(req);
+      const updated = await this.usersService.updateUser(targetUserId, body, session.userId);
+      return jsonResponse(200, updated);
+    }
+
+    if (targetUserId && req.method === "DELETE") {
+      const session = requireAuth(req, this.auth);
+      this.auth.requireAdmin(session);
+      await this.usersService.deleteUser(targetUserId, session.userId);
+      return jsonResponse(200, { userId: targetUserId, deleted: true });
     }
 
     return undefined;
