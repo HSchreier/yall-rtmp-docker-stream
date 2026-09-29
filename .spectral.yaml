@@ -1,0 +1,16 @@
+extends: ["spectral:oas"]
+
+rules:
+  operation-must-have-security:
+    description: >
+      Every operation must declare an explicit `security` requirement — even
+      `security: []` for the deliberately public routes (/health, /stats,
+      the internal nginx-notify routes). The spec-first guard against an
+      accidentally-unauthenticated endpoint: this only proves *some*
+      security block exists, not that the logic behind it is correct — see
+      docs/TECHNICAL.md §Security suite for what it can't catch.
+    given: "$.paths[*][get,put,post,delete,patch]"
+    severity: error
+    then:
+      field: security
+      function: defined

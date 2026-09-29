@@ -1,0 +1,65 @@
+name: CI
+
+# Two-tier flow (feature -> staging -> main), not Stagebox's three — there's
+# only one deployable here. Same checks run on staging and on staging->main,
+# per docs/TECHNICAL.md §CI/CD pipeline: no separate "Main CI" shape yet,
+# since there's no docs-only fast path worth speeding up here.
+#
+# NOT in this workflow yet, on purpose, not by oversight: a Docker build
+# step and the docker-compose + synthetic-ffmpeg-stream integration suite.
+# No Dockerfile exists (waits on NginxConfigRenderer/NginxProcessManager —
+# see docs/TECHNICAL.md's build order). A job that always fails because the
+# file it needs doesn't exist is a permanent red X with no signal, worse
+# than not having the job at all.
+on:
+  push:
+    branches:
+      - main
+      - staging
+      - 'feature/**'
+  pull_request:
+
+jobs:
+  spec-sync:
+    name: Spec sync (openapi.yaml <-> TECHNICAL.md)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.11
+      # Zero dependencies, no Mongo/build needed — the actual enforcement of
+      # "openapi.yaml is a second source of truth" claim, not just prose.
+      - run: bun scripts/check-spec-sync.ts
+
+  build-and-test:
+    name: Lint, typecheck, unit + integration tests, compile
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })' --quiet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.11
+      - run: bun install --frozen-lockfile
+      - name: Lint
+        run: bunx @biomejs/biome check src/ scripts/ tests/
+      - name: Typecheck
+        run: bunx tsc --noEmit
+      - name: Unit tests
+        run: bun test tests/unit/
+      - name: Integration tests
+        env:
+          MONGO_TEST_URI: mongodb://localhost:27017/ci-test
+        run: bun test tests/integration/
+      - name: Compile (bun build --compile)
+        run: bun build ./src/index.ts --compile --outfile dist/sidecar

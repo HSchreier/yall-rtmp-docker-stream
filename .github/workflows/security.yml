@@ -1,0 +1,72 @@
+name: Security
+
+# Modeled directly on Stagebox's own security.yml — same three-pronged
+# shape, rules grounded in this project's own invariants. See
+# docs/TECHNICAL.md §Security suite.
+on:
+  push:
+    branches:
+      - main
+      - staging
+      - 'feature/**'
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+  pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so gitleaks can scan all commits on the branch
+      - name: Run gitleaks
+        run: |
+          VERSION=8.18.4
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          ./gitleaks detect --source . --redact --no-banner --exit-code 1
+
+  sast:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet semgrep
+      # Blocking: ERROR-severity invariants (updatedBy/registeredBy/activatedBy
+      # must come from the verified JWT, never the parsed request body).
+      - name: Semgrep — project invariants (blocking)
+        run: |
+          semgrep --config .semgrep/ --severity ERROR --error --metrics off || \
+            { code=$?; [ $code -eq 7 ] && echo "No target files yet — skipping" && exit 0; exit $code; }
+      # Advisory: role-from-body and secret-like-event-payload — surfaced,
+      # never block on their own (see .semgrep/security.yml for why).
+      - name: Semgrep — advisory (warnings)
+        continue-on-error: true
+        run: |
+          semgrep --config .semgrep/ --metrics off || \
+            { code=$?; [ $code -eq 7 ] && exit 0; exit $code; }
+
+  spec-security:
+    name: OpenAPI security lint (Spectral)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.11
+      # Fails if any operation omits an explicit `security` block — the
+      # spec-first guard against an accidentally-unauthenticated endpoint.
+      - name: Spectral lint
+        run: bunx @stoplight/spectral-cli lint openapi.yaml --ruleset .spectral.yaml --fail-severity error
