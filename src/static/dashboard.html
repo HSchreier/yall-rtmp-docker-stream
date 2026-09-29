@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dashboard — Ya'll Cast</title>
+<link rel="stylesheet" href="/modernist.css" />
+<link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+<header class="nav">
+  <span class="nav-brand">Ya'll Cast</span>
+  <span id="who" class="text-muted"></span>
+  <span id="role-tag" class="tag tag-neutral" hidden></span>
+  <button type="button" class="btn btn-secondary" id="logout-btn">Log out</button>
+</header>
+
+<main class="page stack" id="app" hidden>
+  <!-- Status -->
+  <div class="status-grid">
+    <div class="card">
+      <p class="card-kicker">Broadcast</p>
+      <h2 class="card-title">Live status not wired up yet</h2>
+      <p class="card-body text-muted">
+        StreamState/SSE aren't built yet — this card is a placeholder until then.
+        See docs/TECHNICAL.md.
+      </p>
+    </div>
+    <div class="card">
+      <p class="card-kicker">Active profile</p>
+      <h2 class="card-title" id="active-profile-text">Loading…</h2>
+      <p class="card-body" id="active-profile-sub"></p>
+      <button type="button" class="btn btn-primary btn-block" id="activate-btn" hidden>Activate my profile</button>
+    </div>
+  </div>
+
+  <!-- Ingest URL (only shown when this account is the active profile) -->
+  <div class="ingest-url-box" id="ingest-box" hidden>
+    <div>
+      <p class="card-kicker">OBS ingest URL · stream here</p>
+      <code id="ingest-url"></code>
+    </div>
+    <button type="button" class="btn btn-primary" id="copy-btn">Copy URL</button>
+  </div>
+
+  <!-- Connection info: every real endpoint/port involved, and what's
+       actually running vs. not (nginx/RTMP doesn't exist in this build
+       yet — only this HTTP control API does). -->
+  <div class="card">
+    <p class="card-kicker">Connection info</p>
+    <h2 class="card-title">Endpoints &amp; ports</h2>
+    <table class="table">
+      <tbody id="endpoints-table"></tbody>
+    </table>
+    <p class="card-body text-muted" id="endpoints-note"></p>
+  </div>
+
+  <!-- Destination profile -->
+  <div class="card">
+    <p class="card-kicker" id="profile-kicker">Your profile</p>
+    <h2 class="card-title" id="profile-title">Where should your stream go?</h2>
+    <p class="card-body text-muted" id="profile-lede"></p>
+
+    <form id="profile-form">
+      <div class="destination-grid">
+        <div class="card">
+          <div class="row">
+            <h4>Mixcloud</h4>
+            <label class="radio"><input type="checkbox" name="mixcloud_enabled" /> <span>On</span></label>
+          </div>
+          <div class="field">
+            <label for="mixcloud_key">Stream key</label>
+            <input class="input" id="mixcloud_key" name="mixcloud_key" placeholder="Paste your Mixcloud key" />
+          </div>
+        </div>
+        <div class="card">
+          <div class="row">
+            <h4>YouTube</h4>
+            <label class="radio"><input type="checkbox" name="youtube_enabled" /> <span>On</span></label>
+          </div>
+          <div class="field">
+            <label for="youtube_key">Stream key</label>
+            <input class="input" id="youtube_key" name="youtube_key" placeholder="Paste your YouTube key" />
+          </div>
+        </div>
+        <div class="card">
+          <div class="row">
+            <h4>Twitch</h4>
+            <label class="radio"><input type="checkbox" name="twitch_enabled" /> <span>On</span></label>
+          </div>
+          <div class="field">
+            <label for="twitch_key">Stream key</label>
+            <input class="input" id="twitch_key" name="twitch_key" placeholder="Paste your Twitch key" />
+          </div>
+        </div>
+      </div>
+      <p class="error-text" role="alert" hidden></p>
+      <p class="card-body" id="save-status"></p>
+      <button class="btn btn-primary" type="submit" id="save-btn" style="min-width:180px">Save</button>
+    </form>
+  </div>
+
+  <!-- Admin panel -->
+  <div class="card" id="admin-panel" hidden>
+    <p class="card-kicker">Admin</p>
+    <h2 class="card-title">Register a user</h2>
+    <form id="register-form">
+      <div class="field">
+        <label for="reg-email">Email</label>
+        <input class="input" id="reg-email" name="email" type="email" required />
+      </div>
+      <div class="field">
+        <label for="reg-password">Password · 12+ characters</label>
+        <input class="input" id="reg-password" name="password" type="password" minlength="12" required />
+      </div>
+      <fieldset class="field" style="border:0;padding:0;margin:0">
+        <legend style="font-size:12px;margin-bottom:5px;color:color-mix(in srgb, var(--color-text) 70%, transparent)">Role</legend>
+        <div class="seg">
+          <label class="seg-opt"><input type="radio" name="role" value="user" checked /> User</label>
+          <label class="seg-opt"><input type="radio" name="role" value="admin" /> Admin</label>
+        </div>
+      </fieldset>
+      <p class="error-text" role="alert" hidden></p>
+      <p class="card-body" id="register-status"></p>
+      <button class="btn btn-primary" type="submit">Create account</button>
+    </form>
+
+    <div class="hr"></div>
+
+    <h4>Activate a user by id</h4>
+    <p class="card-body text-muted">
+      No user list endpoint yet — paste a userId (e.g. from the register response) to activate it.
+    </p>
+    <form id="activate-user-form" class="row">
+      <input class="input" name="userId" placeholder="userId" style="flex:1" required />
+      <button class="btn btn-secondary" type="submit">Activate</button>
+    </form>
+  </div>
+</main>
+
+<script src="/app.js"></script>
+<script>
+  let session = null;
+
+  // Defaults exactly as documented in docs/TECHNICAL.md §Persistence & auth
+  // — what nginx will push to unless a profile sets its own customIngestUrl.
+  const DEFAULT_DESTINATION_URLS = {
+    mixcloud: "rtmp://rtmp.mixcloud.com/broadcast",
+    youtube: "rtmp://a.rtmp.youtube.com/live2",
+    twitch: "rtmp://live.twitch.tv/app",
+  };
+  const RTMP_PORT = 1935;
+
+  function endpointRow(label, value, note) {
+    return `<tr><th>${label}</th><td><code>${value}</code>${note ? ` <span class="text-muted">${note}</span>` : ""}</td></tr>`;
+  }
+
+  async function renderEndpoints(profile) {
+    const health = await Yallcast.api("GET", "/health");
+    const rows = [];
+
+    rows.push(
+      endpointRow(
+        "This dashboard / HTTP API",
+        `${location.protocol}//${location.host}`,
+        "the control API you're using right now",
+      ),
+    );
+
+    if (profile) {
+      rows.push(
+        endpointRow(
+          "OBS ingest (RTMP)",
+          `rtmp://${location.hostname}:${RTMP_PORT}/ingest/${profile.ingestStreamKey}`,
+          health.ok && !health.data.nginxReachable
+            ? "— not live yet, nginx/RTMP isn't built/running in this dev build"
+            : "",
+        ),
+      );
+    }
+
+    for (const dest of ["mixcloud", "youtube", "twitch"]) {
+      const entry = profile?.[dest];
+      const base = entry?.customIngestUrl || DEFAULT_DESTINATION_URLS[dest];
+      const target = entry?.enabled && entry?.streamKey ? `${base}/${entry.streamKey}` : base;
+      const label = dest.charAt(0).toUpperCase() + dest.slice(1);
+      rows.push(
+        endpointRow(
+          `→ ${label}`,
+          target,
+          entry?.enabled ? "" : "off — no push line rendered for this one",
+        ),
+      );
+    }
+
+    document.getElementById("endpoints-table").innerHTML = rows.join("");
+    document.getElementById("endpoints-note").textContent = health.ok
+      ? `mongoReachable: ${health.data.mongoReachable} · nginxReachable: ${health.data.nginxReachable} · ingestStatus: ${health.data.ingestStatus}`
+      : "Couldn't reach /health.";
+  }
+
+  function setDestinationField(form, prefix, entry) {
+    form.elements[`${prefix}_enabled`].checked = !!entry?.enabled;
+    form.elements[`${prefix}_key`].value = entry?.streamKey ?? "";
+  }
+
+  function readDestination(form, prefix) {
+    const enabled = form.elements[`${prefix}_enabled`].checked;
+    const streamKey = form.elements[`${prefix}_key`].value;
+    return { enabled, ...(streamKey ? { streamKey } : {}) };
+  }
+
+  async function loadProfile() {
+    const res = await Yallcast.api("GET", "/profile");
+    const form = document.getElementById("profile-form");
+    if (res.status === 404) {
+      document.getElementById("profile-title").textContent = "Where should your stream go?";
+      document.getElementById("profile-lede").textContent =
+        "Set up at least one destination to get your OBS ingest URL.";
+      return null;
+    }
+    if (res.ok) {
+      document.getElementById("profile-title").textContent = "Edit destinations";
+      document.getElementById("profile-lede").textContent =
+        "Changes apply the next time you start streaming.";
+      setDestinationField(form, "mixcloud", res.data.mixcloud);
+      setDestinationField(form, "youtube", res.data.youtube);
+      setDestinationField(form, "twitch", res.data.twitch);
+      return res.data;
+    }
+    return null;
+  }
+
+  async function refreshActiveStatus(profile) {
+    // No GET /relay-state endpoint yet — infer "am I active" indirectly:
+    // there's no direct way to ask this without a dedicated route, so for
+    // now this just shows the ingest URL once a profile exists and lets
+    // "Activate my profile" always be available. A real "who's active"
+    // display needs a route that doesn't exist yet.
+    const activateBtn = document.getElementById("activate-btn");
+    const activeText = document.getElementById("active-profile-text");
+    const activeSub = document.getElementById("active-profile-sub");
+    if (profile) {
+      activeText.textContent = "Profile ready";
+      activeSub.textContent = "Activate to make this the live broadcast profile.";
+      activateBtn.hidden = false;
+    } else {
+      activeText.textContent = "No profile yet";
+      activeSub.textContent = "Set up a destination below first.";
+      activateBtn.hidden = true;
+    }
+  }
+
+  async function init() {
+    session = await Yallcast.requireAuth();
+    if (!session) return;
+
+    document.getElementById("who").textContent = session.email;
+    const roleTag = document.getElementById("role-tag");
+    roleTag.textContent = session.role;
+    roleTag.hidden = false;
+    if (session.role === "admin") document.getElementById("admin-panel").hidden = false;
+
+    const profile = await loadProfile();
+    await refreshActiveStatus(profile);
+    if (profile) {
+      document.getElementById("ingest-box").hidden = false;
+      document.getElementById("ingest-url").textContent =
+        `rtmp://${location.hostname}:${RTMP_PORT}/ingest/${profile.ingestStreamKey}`;
+    }
+    await renderEndpoints(profile);
+
+    document.getElementById("app").hidden = false;
+  }
+
+  document.getElementById("logout-btn").addEventListener("click", () => Yallcast.logout());
+
+  Yallcast.bindForm("#profile-form", async (_data) => {
+    const form = document.getElementById("profile-form");
+    const body = {
+      mixcloud: readDestination(form, "mixcloud"),
+      youtube: readDestination(form, "youtube"),
+      twitch: readDestination(form, "twitch"),
+    };
+    const res = await Yallcast.api("PUT", "/profile", body);
+    if (res.ok) {
+      document.getElementById("save-status").textContent =
+        `Saved at ${new Date().toLocaleTimeString()}`;
+      document.getElementById("ingest-box").hidden = false;
+      document.getElementById("ingest-url").textContent =
+        `rtmp://${location.hostname}:${RTMP_PORT}/ingest/${res.data.ingestStreamKey}`;
+      await refreshActiveStatus(res.data);
+      await renderEndpoints(res.data);
+    }
+    return res;
+  });
+
+  document.getElementById("activate-btn").addEventListener("click", async () => {
+    await Yallcast.api("POST", "/profile/activate");
+    location.reload();
+  });
+
+  document.getElementById("copy-btn").addEventListener("click", () => {
+    navigator.clipboard.writeText(document.getElementById("ingest-url").textContent);
+    const btn = document.getElementById("copy-btn");
+    const original = btn.textContent;
+    btn.textContent = "Copied";
+    setTimeout(() => (btn.textContent = original), 1600);
+  });
+
+  Yallcast.bindForm("#register-form", async (data) => {
+    const res = await Yallcast.api("POST", "/auth/register", data);
+    if (res.ok) {
+      document.getElementById("register-status").textContent =
+        `Created ${res.data.email} (${res.data.role}). userId: ${res.data.userId}`;
+      document.getElementById("register-form").reset();
+    }
+    return res;
+  });
+
+  Yallcast.bindForm("#activate-user-form", async (data) => {
+    return Yallcast.api("POST", `/users/${encodeURIComponent(data.userId)}/activate`);
+  });
+
+  init();
+</script>
+</body>
+</html>

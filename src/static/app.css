@@ -1,0 +1,94 @@
+/* Thin glue on top of Modernist (/modernist.css) — layout only, no new
+   colors/type/spacing tokens of its own. See assets/design-system/modernist/readme.md. */
+
+.page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-4);
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  border-top: 2px solid var(--color-divider);
+  border-bottom: 2px solid var(--color-divider);
+}
+.hero-grid > * {
+  padding: var(--space-6) var(--space-4);
+}
+.hero-grid > *:last-child {
+  border-left: 2px solid var(--color-divider);
+}
+
+.field + .field {
+  margin-top: var(--space-4);
+}
+
+.error-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-accent-700);
+}
+
+.notice {
+  background: var(--color-neutral-200);
+  font-size: 14px;
+  font-weight: 600;
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 2px;
+  background: var(--color-divider);
+  border: 2px solid var(--color-divider);
+}
+.status-grid > .card {
+  min-height: 180px;
+}
+
+.destination-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 2px;
+  background: var(--color-divider);
+  border: 2px solid var(--color-divider);
+  margin: var(--space-4) 0;
+}
+.destination-grid > .card {
+  background: var(--color-bg);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.ingest-url-box {
+  border: 2px solid var(--color-accent);
+  background: var(--color-accent-100);
+  padding: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.ingest-url-box code {
+  font-size: 14px;
+  word-break: break-all;
+}
+
+[hidden] {
+  display: none;
+}
