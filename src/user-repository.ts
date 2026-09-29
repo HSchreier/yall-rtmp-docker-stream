@@ -73,6 +73,11 @@ export class UserRepository {
     return row ? toDoc(row as UserRow) : null;
   }
 
+  async list(): Promise<UserDoc[]> {
+    const rows = await this.#collection.find({}).sort({ createdAt: 1 }).toArray();
+    return (rows as UserRow[]).map(toDoc);
+  }
+
   async create(input: {
     email: string;
     passwordHash: string;

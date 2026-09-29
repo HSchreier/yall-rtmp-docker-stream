@@ -127,14 +127,13 @@
 
     <div class="hr"></div>
 
-    <h4>Activate a user by id</h4>
-    <p class="card-body text-muted">
-      No user list endpoint yet — paste a userId (e.g. from the register response) to activate it.
-    </p>
-    <form id="activate-user-form" class="row">
-      <input class="input" name="userId" placeholder="userId" style="flex:1" required />
-      <button class="btn btn-secondary" type="submit">Activate</button>
-    </form>
+    <h4>All users</h4>
+    <table class="table">
+      <thead>
+        <tr><th>Account</th><th>Role</th><th>Profile</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody id="users-table-body"></tbody>
+    </table>
   </div>
 </main>
 
@@ -259,7 +258,10 @@
     const roleTag = document.getElementById("role-tag");
     roleTag.textContent = session.role;
     roleTag.hidden = false;
-    if (session.role === "admin") document.getElementById("admin-panel").hidden = false;
+    if (session.role === "admin") {
+      document.getElementById("admin-panel").hidden = false;
+      await loadUsersTable();
+    }
 
     const profile = await loadProfile();
     await refreshActiveStatus(profile);
@@ -291,6 +293,7 @@
         `rtmp://${location.hostname}:${RTMP_PORT}/ingest/${res.data.ingestStreamKey}`;
       await refreshActiveStatus(res.data);
       await renderEndpoints(res.data);
+      if (session.role === "admin") await loadUsersTable();
     }
     return res;
   });
@@ -312,14 +315,38 @@
     const res = await Yallcast.api("POST", "/auth/register", data);
     if (res.ok) {
       document.getElementById("register-status").textContent =
-        `Created ${res.data.email} (${res.data.role}). userId: ${res.data.userId}`;
+        `Created ${res.data.email} (${res.data.role}).`;
       document.getElementById("register-form").reset();
+      await loadUsersTable();
     }
     return res;
   });
 
-  Yallcast.bindForm("#activate-user-form", async (data) => {
-    return Yallcast.api("POST", `/users/${encodeURIComponent(data.userId)}/activate`);
+  async function loadUsersTable() {
+    const res = await Yallcast.api("GET", "/users");
+    if (!res.ok) return;
+    const tbody = document.getElementById("users-table-body");
+    tbody.innerHTML = res.data.users
+      .map((u) => {
+        const you = u.userId === session?.userId ? " <span class=\"text-muted\">(you)</span>" : "";
+        const profileText = u.hasProfile ? "Set up" : "Not set up yet";
+        const statusTag = u.isActive
+          ? '<span class="tag tag-accent">Active</span>'
+          : '<span class="text-muted">—</span>';
+        const action =
+          u.hasProfile && !u.isActive
+            ? `<button type="button" class="btn btn-secondary" data-activate-user="${u.userId}">Activate</button>`
+            : "";
+        return `<tr><td>${u.email}${you}</td><td>${u.role}</td><td>${profileText}</td><td>${statusTag}</td><td>${action}</td></tr>`;
+      })
+      .join("");
+  }
+
+  document.getElementById("users-table-body").addEventListener("click", async (event) => {
+    const userId = event.target?.dataset?.activateUser;
+    if (!userId) return;
+    await Yallcast.api("POST", `/users/${encodeURIComponent(userId)}/activate`);
+    location.reload();
   });
 
   init();
