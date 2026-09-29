@@ -123,8 +123,23 @@ export class HttpApi {
       return this.#serveAsset("/setup.html");
     }
 
+    if (pathname === "/login.html" && req.method === "GET") {
+      // Symmetric with /setup.html above — reaching /login.html directly
+      // (bookmark, back button, a stale tab) with no admin yet would
+      // otherwise show a login form with nothing to log into.
+      if (await this.deps.users.isEmpty()) {
+        return redirect("/setup.html");
+      }
+      return this.#serveAsset("/login.html");
+    }
+
     const staticAsset = this.#assets.get(pathname);
-    if (staticAsset && req.method === "GET" && pathname !== "/setup.html") {
+    if (
+      staticAsset &&
+      req.method === "GET" &&
+      pathname !== "/setup.html" &&
+      pathname !== "/login.html"
+    ) {
       return this.#serveAsset(pathname);
     }
 
