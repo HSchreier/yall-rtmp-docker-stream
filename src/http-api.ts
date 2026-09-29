@@ -148,6 +148,28 @@ export class HttpApi {
       return jsonResponse(200, { userId: user.userId, email: user.email, role: user.role });
     }
 
+    if (pathname === "/users" && req.method === "GET") {
+      const session = this.#requireAuth(req);
+      this.deps.auth.requireAdmin(session);
+      const [users, activeUserId] = await Promise.all([
+        this.deps.users.list(),
+        this.deps.relayState.getActiveUserId(),
+      ]);
+      const rows = await Promise.all(
+        users.map(async (u) => ({
+          userId: u.userId,
+          email: u.email,
+          role: u.role,
+          // passwordHash deliberately excluded — same _id-leak lesson as
+          // DestinationProfileRepository.get(): never return the whole
+          // stored document just because it was convenient to.
+          hasProfile: await this.deps.destinationProfiles.exists(u.userId),
+          isActive: u.userId === activeUserId,
+        })),
+      );
+      return jsonResponse(200, { users: rows });
+    }
+
     if (pathname === "/auth/register" && req.method === "POST") {
       const body = await readJson<RegisterInput>(req);
       const actingUser = this.#tryAuth(req);

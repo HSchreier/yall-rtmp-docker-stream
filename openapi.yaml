@@ -207,6 +207,31 @@ paths:
         '503':
           $ref: '#/components/responses/UpstreamError'
 
+  /users:
+    get:
+      operationId: listUsers
+      tags: [profile]
+      summary: Admin-only — list every account.
+      description: passwordHash is never included, same discipline as DestinationProfileRepository.get() not leaking Mongo's raw _id.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Every account, with profile/active status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+        '401':
+          $ref: '#/components/responses/AuthError'
+        '403':
+          description: Valid session, but not an admin.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /users/{userId}/activate:
     post:
       operationId: activateUserProfile
@@ -419,6 +444,25 @@ components:
         userId: { type: string }
         email: { type: string, format: email }
         role: { type: string, enum: [user, admin] }
+
+    UserListEntry:
+      type: object
+      required: [userId, email, role, hasProfile, isActive]
+      properties:
+        userId: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [user, admin] }
+        hasProfile: { type: boolean }
+        isActive: { type: boolean }
+
+    UserListResponse:
+      type: object
+      required: [users]
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserListEntry'
 
     DestinationEntry:
       type: object

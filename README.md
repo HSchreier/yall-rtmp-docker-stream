@@ -25,7 +25,23 @@ A single containerized agent that takes one RTMP ingest from OBS and relays it l
 
 **The RTMP relay itself does not exist yet.** What's real: the control-plane app — auth, per-user destination profiles, activation, a working browser UI — verified end to end against a live Mongo, not just unit-tested. What's missing: `nginx-rtmp-module`, the actual relay logic, `StreamState`, live status. See the [release notes](https://github.com/HSchreier/yall-rtmp-docker-stream/releases/tag/v0.1.0-alpha.1) for the full honest breakdown, and `docs/TECHNICAL.md`'s "Open questions" for what's still unresolved.
 
-## Local dev
+## Install
+
+```bash
+git clone https://github.com/HSchreier/yall-rtmp-docker-stream.git
+cd yall-rtmp-docker-stream
+./scripts/install.sh
+```
+
+Checks for Bun and Docker (installs Bun automatically if missing; Docker needs a manual install from [docker.com](https://docs.docker.com/get-docker/) — a GUI install with a license to accept, not something to script blindly), generates `.env` with a real random `JWT_SECRET`, installs dependencies, starts Mongo. Safe to re-run — won't touch an existing `.env`.
+
+```bash
+bun run dev   # --watch, http://localhost:8080
+```
+
+First visit walks you through creating the administrator account — no separate seed step.
+
+## Local dev (manual, if you'd rather not run the script)
 
 ```bash
 docker compose up -d mongo
