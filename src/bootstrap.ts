@@ -4,14 +4,18 @@
 // gets called for a singleton.
 //
 // Current slice: Logger, the process-level safety net, EventBus,
-// ConfigService, MongoService, and the three repositories. Everything else
-// in docs/TECHNICAL.md's module list (AuthService, the nginx-facing
-// modules, HttpApi, ...) isn't built yet — added incrementally, bottom-up
-// by dependency, per the build order agreed before starting.
+// ConfigService, MongoService, the three repositories, AuthService, and a
+// first-cut HttpApi. Still missing vs. docs/TECHNICAL.md's module list:
+// StreamState, the nginx-facing modules (NginxConfigRenderer,
+// NginxProcessManager, IngestEventReceiver), HealthService, StreamOrchestrator
+// and its submodules, AuditLogger — added incrementally, bottom-up by
+// dependency.
 
+import { AuthService } from "./auth-service.ts";
 import { ConfigService } from "./config-service.ts";
 import { DestinationProfileRepository } from "./destination-profile-repository.ts";
 import { EventBus } from "./event-bus.ts";
+import { HttpApi } from "./http-api.ts";
 import { Logger } from "./logger.ts";
 import { MongoService } from "./mongo-service.ts";
 import { RelayStateRepository } from "./relay-state-repository.ts";
@@ -25,6 +29,8 @@ export interface App {
   readonly users: UserRepository;
   readonly destinationProfiles: DestinationProfileRepository;
   readonly relayState: RelayStateRepository;
+  readonly auth: AuthService;
+  readonly httpApi: HttpApi;
 }
 
 export async function bootstrap(): Promise<App> {
@@ -65,5 +71,31 @@ export async function bootstrap(): Promise<App> {
   await destinationProfiles.init();
   const relayState = new RelayStateRepository(mongo.db(), eventBus);
 
-  return { logger, eventBus, config, mongo, users, destinationProfiles, relayState };
+  // Step 3: AuthService has no init() — stateless, no side effects beyond
+  // per-call behavior.
+  const auth = new AuthService(users, eventBus, config.get().jwtSecret);
+
+  // Step 4: HttpApi last — binds the listener only once everything it might
+  // touch on an incoming request is already up.
+  const httpApi = new HttpApi({
+    auth,
+    destinationProfiles,
+    relayState,
+    mongo,
+    logger,
+    httpPort: config.get().httpPort,
+  });
+  httpApi.init();
+
+  return {
+    logger,
+    eventBus,
+    config,
+    mongo,
+    users,
+    destinationProfiles,
+    relayState,
+    auth,
+    httpApi,
+  };
 }
