@@ -7,6 +7,7 @@ import { DestinationProfileRepository } from "../../src/modules/profiles/profile
 
 const uri =
   process.env.MONGO_TEST_URI ?? "mongodb://localhost:27117/destination-profile-repository-test";
+const TEST_ENCRYPTION_KEY = Buffer.from("00".repeat(32), "hex");
 
 describe("DestinationProfileRepository (integration — requires live Mongo)", () => {
   let mongo: MongoService;
@@ -18,7 +19,7 @@ describe("DestinationProfileRepository (integration — requires live Mongo)", (
     mongo = new MongoService(logger, uri);
     await mongo.init();
     eventBus = new EventBus(logger);
-    repo = new DestinationProfileRepository(mongo.db(), eventBus);
+    repo = new DestinationProfileRepository(mongo.db(), eventBus, TEST_ENCRYPTION_KEY);
     await repo.init();
   });
 
@@ -84,5 +85,21 @@ describe("DestinationProfileRepository (integration — requires live Mongo)", (
     );
     expect(doc.youtube).toEqual({ enabled: false });
     expect(doc.twitch).toEqual({ enabled: false });
+  });
+
+  test("streamKey is actually encrypted at rest, not stored as plaintext", async () => {
+    const plaintext = "super-secret-mixcloud-key";
+    await repo.upsert("user-5", { mixcloud: { enabled: true, streamKey: plaintext } }, "user-5");
+
+    // Bypass the repository entirely — read what's really sitting in Mongo.
+    const raw = await mongo
+      .db()
+      .collection<{ mixcloud: { streamKey?: string } }>("destination_profiles")
+      .findOne({ userId: "user-5" } as never);
+
+    expect(raw?.mixcloud.streamKey).toBeDefined();
+    expect(raw?.mixcloud.streamKey).not.toBe(plaintext);
+    // The repository's own get() still returns it decrypted.
+    expect((await repo.get("user-5"))?.mixcloud.streamKey).toBe(plaintext);
   });
 });

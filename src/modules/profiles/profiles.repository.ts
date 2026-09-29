@@ -3,9 +3,26 @@
 // `DestinationCredentialsUpdated` per changed destination on write — the
 // event schema is explicitly one-destination-per-event, so a PUT touching
 // two destinations at once emits two events, not one summarizing both.
+//
+// Destination stream keys are the actual live RTMP credentials for
+// someone's Mixcloud/YouTube/Twitch account — encrypted at rest
+// (AES-256-GCM, see infra/crypto.ts) rather than stored as plaintext.
+// Encrypt/decrypt happens only here, at the persistence boundary — every
+// caller above this repository (services, routers, the dashboard) works
+// with plaintext, same as before; this class is the only place that knows
+// the value on disk isn't the value the user typed.
+//
+// `ingestStreamKey` (this app's own generated key, not a third-party
+// credential) is deliberately left unencrypted for now — a future
+// nginx-notify webhook needs to look a user up *by* this value, and GCM's
+// random per-call IV means the same plaintext never produces the same
+// ciphertext twice, which rules out an equality query without decrypting
+// every document first. Flagged, not hidden — revisit once that webhook
+// exists and either query pattern can be evaluated for real.
 
 import { randomBytes } from "node:crypto";
 import type { Collection, Db } from "mongodb";
+import { decryptSecret, encryptSecret } from "../../infra/crypto.ts";
 import type { EventBus } from "../../infra/event-bus.ts";
 import type { Destination } from "../../infra/events.ts";
 
@@ -28,6 +45,7 @@ export interface DestinationProfileDoc {
 export type DestinationProfileUpdate = Partial<Record<Destination, Partial<DestinationEntry>>>;
 
 const EMPTY_ENTRY: DestinationEntry = { enabled: false };
+const DESTINATIONS = ["mixcloud", "youtube", "twitch"] as const;
 
 function generateIngestStreamKey(): string {
   return randomBytes(24).toString("hex");
@@ -39,6 +57,7 @@ export class DestinationProfileRepository {
   constructor(
     db: Db,
     private readonly eventBus: EventBus,
+    private readonly encryptionKey: Buffer,
   ) {
     this.#collection = db.collection<DestinationProfileDoc>("destination_profiles");
   }
@@ -47,12 +66,41 @@ export class DestinationProfileRepository {
     await this.#collection.createIndex({ userId: 1 }, { unique: true });
   }
 
+  #decryptDoc(doc: DestinationProfileDoc): DestinationProfileDoc {
+    const decrypted = { ...doc };
+    for (const dest of DESTINATIONS) {
+      const entry = doc[dest];
+      if (entry.streamKey) {
+        decrypted[dest] = {
+          ...entry,
+          streamKey: decryptSecret(entry.streamKey, this.encryptionKey),
+        };
+      }
+    }
+    return decrypted;
+  }
+
+  #encryptDoc(doc: DestinationProfileDoc): DestinationProfileDoc {
+    const encrypted = { ...doc };
+    for (const dest of DESTINATIONS) {
+      const entry = doc[dest];
+      if (entry.streamKey) {
+        encrypted[dest] = {
+          ...entry,
+          streamKey: encryptSecret(entry.streamKey, this.encryptionKey),
+        };
+      }
+    }
+    return encrypted;
+  }
+
   async get(userId: string): Promise<DestinationProfileDoc | null> {
     // Project _id out — it's Mongo's own internal id, not part of the
     // documented Profile shape in openapi.yaml, and leaking it in an API
     // response is exactly the kind of thing that's easy to miss without
     // actually testing the response, not just the type signature.
-    return this.#collection.findOne({ userId }, { projection: { _id: 0 } });
+    const doc = await this.#collection.findOne({ userId }, { projection: { _id: 0 } });
+    return doc ? this.#decryptDoc(doc) : null;
   }
 
   async exists(userId: string): Promise<boolean> {
@@ -65,8 +113,9 @@ export class DestinationProfileRepository {
     update: DestinationProfileUpdate,
     updatedBy: string,
   ): Promise<DestinationProfileDoc> {
-    const existing = await this.#collection.findOne({ userId });
-    const ingestStreamKey = existing?.ingestStreamKey ?? generateIngestStreamKey();
+    const existingRaw = await this.#collection.findOne({ userId });
+    const existing = existingRaw ? this.#decryptDoc(existingRaw) : null;
+    const ingestStreamKey = existingRaw?.ingestStreamKey ?? generateIngestStreamKey();
 
     const next: DestinationProfileDoc = {
       userId,
@@ -78,7 +127,7 @@ export class DestinationProfileRepository {
       updatedBy,
     };
 
-    await this.#collection.replaceOne({ userId }, next, { upsert: true });
+    await this.#collection.replaceOne({ userId }, this.#encryptDoc(next), { upsert: true });
 
     const at = next.updatedAt;
     for (const destination of Object.keys(update) as Destination[]) {

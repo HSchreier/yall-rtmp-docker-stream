@@ -73,7 +73,11 @@ export async function bootstrap(): Promise<App> {
 
   const users = new UserRepository(mongo.db());
   await users.init();
-  const destinationProfiles = new DestinationProfileRepository(mongo.db(), eventBus);
+  const destinationProfiles = new DestinationProfileRepository(
+    mongo.db(),
+    eventBus,
+    config.get().encryptionKey,
+  );
   await destinationProfiles.init();
   const relayState = new RelayStateRepository(mongo.db(), eventBus);
 
