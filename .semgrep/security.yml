@@ -1,0 +1,75 @@
+rules:
+
+  # ── BLOCKER: updatedBy must be set from the verified JWT, never the body ──
+  # HttpApi reads request bodies via `const body = await readJson<T>(req)` —
+  # not Express's req.body — so the pattern matches this codebase's actual
+  # shape, not a generic Express one.
+  - id: updated-by-from-body
+    severity: ERROR
+    languages: [typescript]
+    message: |
+      updatedBy must never come from the parsed request body — it must
+      always be the verified JWT's user id. See docs/TECHNICAL.md
+      §Security invariants.
+    pattern: body.updatedBy
+
+  # ── BLOCKER: registeredBy must be set server-side ─────────────────────────
+  - id: registered-by-from-body
+    severity: ERROR
+    languages: [typescript]
+    message: |
+      registeredBy must never come from the parsed request body — derive it
+      from the verified JWT (or null for the one bootstrap case).
+    pattern: body.registeredBy
+
+  # ── BLOCKER: activatedBy must be set from the verified JWT ────────────────
+  - id: activated-by-from-body
+    severity: ERROR
+    languages: [typescript]
+    message: |
+      activatedBy must never come from the parsed request body — it must
+      always be the verified JWT's user id.
+    pattern: body.activatedBy
+
+  # ── WARNING: role read from body outside AuthService's own gate ──────────
+  - id: role-from-body-unchecked
+    severity: WARNING
+    languages: [typescript]
+    message: |
+      role read from the parsed request body outside AuthService.register().
+      The actual correctness guarantee (bootstrap forces admin, post-bootstrap
+      requires an admin JWT) is proven by AuthService's own unit tests, not
+      by this pattern — this just flags a new call site worth a second look.
+    pattern: body.role
+    paths:
+      exclude:
+        - "**/src/auth-service.ts"
+
+  # ── WARNING: a secret-shaped field ending up in an EventBus payload ──────
+  # Events say what changed, never the value — see docs/TECHNICAL.md's Event
+  # taxonomy. Advisory, not blocking: a field that's named suspiciously but
+  # genuinely isn't a secret is plausible enough that this shouldn't fail a
+  # PR on its own.
+  - id: secret-like-field-in-event-payload
+    severity: WARNING
+    languages: [typescript]
+    message: |
+      EventBus payload includes a field shaped like a credential
+      (streamKey/password/passwordHash/token). Events should say what
+      changed, not carry the secret value.
+    patterns:
+      - pattern-either:
+          - pattern: "$BUS.emit($EVENT, { ..., streamKey: $X, ... })"
+          - pattern: "$BUS.emit($EVENT, { ..., password: $X, ... })"
+          - pattern: "$BUS.emit($EVENT, { ..., passwordHash: $X, ... })"
+          - pattern: "$BUS.emit($EVENT, { ..., token: $X, ... })"
+      - metavariable-regex:
+          metavariable: $BUS
+          regex: '.*[Ee]vent[Bb]us.*'
+
+  # ── ADVISORY, not yet a real check: userId from params/body used without ──
+  # an ownership check in the same function. Genuine taint-tracking (which
+  # Semgrep OSS can do via pattern-sources/pattern-sinks) needed to express
+  # this properly — a simple pattern here would either never fire or false-
+  # positive constantly, which is worse than not having the rule. Left as a
+  # documented gap, not faked. See docs/TECHNICAL.md's Security suite note.
