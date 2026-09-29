@@ -3,19 +3,20 @@ name: Security
 # Modeled directly on Stagebox's own security.yml — same three-pronged
 # shape, rules grounded in this project's own invariants. See
 # docs/TECHNICAL.md §Security suite.
+#
+# No paths-ignore: staging's branch protection requires these three jobs
+# by name on every PR. A docs-only paths-ignore would mean those required
+# checks simply never run for a docs-only PR, and GitHub blocks the merge
+# forever waiting on a status that will never report — found the hard way
+# on the README rewrite PR. The jobs are all fast (<1min combined), so
+# running them unconditionally costs little.
 on:
   push:
     branches:
       - main
       - staging
       - 'feature/**'
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
   pull_request:
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
 
 permissions:
   contents: read
