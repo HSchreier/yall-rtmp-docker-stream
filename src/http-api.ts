@@ -10,20 +10,41 @@
 // anything else is a generic 500 with no internal detail leaked to the
 // client, full detail to the logger.
 //
-// Static pages (setup/login/dashboard + app.js/app.css + the Modernist
-// stylesheet) are read once at init() and served from memory — see
-// docs/TECHNICAL.md's "read once at startup" design.
-//
-// Missing vs. openapi.yaml still: /stats, /events (SSE), the internal
-// nginx-notify routes — those need StreamState/NginxProcessManager, which
-// don't exist yet.
+// Static pages (setup/login/dashboard + app.js/template.js/app.css + the
+// Modernist stylesheet) are imported as text at *build* time — not read
+// from disk in init() — and embedded directly into the module graph. This
+// isn't just a style choice: `Bun.file(new URL(path, import.meta.url))`
+// does NOT get embedded by `bun build --compile` (confirmed by actually
+// running the compiled binary from a directory with no src/ present — it
+// throws `ENOENT ... /$bunfs/root/static/setup.html`, a real bug that
+// would have silently broken every Docker deployment). A `with { type:
+// "text" }` import is what `--compile` actually embeds; see
+// src/types/text-assets.d.ts for the ambient module declarations tsc
+// needs to type these. Side benefit: `bun --watch` now picks up edits to
+// these files too, since they're real imports in the module graph —
+// no more needing a manual restart after touching src/static/*.
 
+import modernistCss from "../assets/design-system/modernist/styles.css" with { type: "text" };
 import { AppError } from "./infra/errors.ts";
 import { jsonResponse, redirect } from "./infra/http.ts";
 import { tryAuth } from "./infra/http-session.ts";
 import type { Logger } from "./infra/logger.ts";
 import type { AuthService } from "./modules/auth/auth.service.ts";
 import type { UserRepository } from "./modules/users/users.repository.ts";
+import appCss from "./static/app.css" with { type: "text" };
+import appJs from "./static/app.js" with { type: "text" };
+// Cast to string: bun-types claims *.html for its own unrelated HTMLBundle
+// dev-server feature, so tsc sees these as HTMLBundle even though Bun's
+// bundler actually resolves them as plain text at both dev and compile
+// time per the `type: "text"` attribute — see text-assets.d.ts.
+import dashboardHtmlRaw from "./static/dashboard.html" with { type: "text" };
+import loginHtmlRaw from "./static/login.html" with { type: "text" };
+import setupHtmlRaw from "./static/setup.html" with { type: "text" };
+import templateJs from "./static/template.js" with { type: "text" };
+
+const dashboardHtml = dashboardHtmlRaw as unknown as string;
+const loginHtml = loginHtmlRaw as unknown as string;
+const setupHtml = setupHtmlRaw as unknown as string;
 
 export interface ModuleRouter {
   handle(req: Request, url: URL): Promise<Response | undefined>;
@@ -42,29 +63,14 @@ interface StaticAsset {
   contentType: string;
 }
 
-const STATIC_DIR = new URL("./static/", import.meta.url);
-const MODERNIST_CSS_PATH = new URL("../assets/design-system/modernist/styles.css", import.meta.url);
-
-const STATIC_FILES: Array<{ route: string; file: URL; contentType: string }> = [
-  { route: "/setup.html", file: new URL("setup.html", STATIC_DIR), contentType: "text/html" },
-  { route: "/login.html", file: new URL("login.html", STATIC_DIR), contentType: "text/html" },
-  {
-    route: "/dashboard.html",
-    file: new URL("dashboard.html", STATIC_DIR),
-    contentType: "text/html",
-  },
-  {
-    route: "/app.js",
-    file: new URL("app.js", STATIC_DIR),
-    contentType: "application/javascript",
-  },
-  {
-    route: "/template.js",
-    file: new URL("template.js", STATIC_DIR),
-    contentType: "application/javascript",
-  },
-  { route: "/app.css", file: new URL("app.css", STATIC_DIR), contentType: "text/css" },
-  { route: "/modernist.css", file: MODERNIST_CSS_PATH, contentType: "text/css" },
+const STATIC_FILES: Array<{ route: string; body: string; contentType: string }> = [
+  { route: "/setup.html", body: setupHtml, contentType: "text/html" },
+  { route: "/login.html", body: loginHtml, contentType: "text/html" },
+  { route: "/dashboard.html", body: dashboardHtml, contentType: "text/html" },
+  { route: "/app.js", body: appJs, contentType: "application/javascript" },
+  { route: "/template.js", body: templateJs, contentType: "application/javascript" },
+  { route: "/app.css", body: appCss, contentType: "text/css" },
+  { route: "/modernist.css", body: modernistCss, contentType: "text/css" },
 ];
 
 export class HttpApi {
@@ -74,8 +80,7 @@ export class HttpApi {
   constructor(private readonly deps: HttpApiDeps) {}
 
   async init(): Promise<void> {
-    for (const { route, file, contentType } of STATIC_FILES) {
-      const body = await Bun.file(file).text();
+    for (const { route, body, contentType } of STATIC_FILES) {
       this.#assets.set(route, { body, contentType });
     }
 
