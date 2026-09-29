@@ -1,0 +1,15 @@
+services:
+  mongo:
+    image: mongo:7
+    ports:
+      - "27117:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  # relay service (nginx + compiled sidecar) isn't added here yet — there's
+  # no Dockerfile until NginxConfigRenderer/NginxProcessManager exist, per
+  # docs/TECHNICAL.md's build order. For now, run the sidecar directly with
+  # `bun run dev` against this mongo service (MONGO_URI=mongodb://localhost:27117/...).
+
+volumes:
+  mongo-data:
