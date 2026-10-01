@@ -3,37 +3,47 @@
 </p>
 
 <p align="center">
-  <img src="https://github.com/HSchreier/yall-rtmp-docker-stream/actions/workflows/ci.yml/badge.svg?branch=staging" alt="CI">
-  <img src="https://github.com/HSchreier/yall-rtmp-docker-stream/actions/workflows/security.yml/badge.svg?branch=staging" alt="Security">
-  <img src="https://img.shields.io/github/v/release/HSchreier/yall-rtmp-docker-stream?include_prereleases&label=release&color=D52B1E" alt="Latest release">
+  <a href="https://github.com/HSchreier/yall-rtmp-docker-stream/actions/workflows/ci.yml"><img src="https://github.com/HSchreier/yall-rtmp-docker-stream/actions/workflows/ci.yml/badge.svg?branch=staging" alt="CI"></a>
+  <a href="https://github.com/HSchreier/yall-rtmp-docker-stream/actions/workflows/security.yml"><img src="https://github.com/HSchreier/yall-rtmp-docker-stream/actions/workflows/security.yml/badge.svg?branch=staging" alt="Security"></a>
+  <a href="https://github.com/HSchreier/yall-rtmp-docker-stream/releases"><img src="https://img.shields.io/github/v/release/HSchreier/yall-rtmp-docker-stream?include_prereleases&label=release&color=D52B1E" alt="Latest release"></a>
+  <a href="https://github.com/HSchreier/yall-rtmp-docker-stream/commits/staging"><img src="https://img.shields.io/github/last-commit/HSchreier/yall-rtmp-docker-stream/staging?label=last%20commit&color=F4B41A&labelColor=1A1410" alt="Last commit"></a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Bun-D52B1E?logo=bun&logoColor=white" alt="Bun">
-  <img src="https://img.shields.io/badge/TypeScript-1A1410?logo=typescript&logoColor=F4B41A" alt="TypeScript">
-  <img src="https://img.shields.io/badge/Docker-EE7A1C?logo=docker&logoColor=white" alt="Docker">
-  <img src="https://img.shields.io/badge/nginx--rtmp-1A1410?logo=nginx&logoColor=F4B41A" alt="nginx-rtmp-module">
-  <img src="https://img.shields.io/badge/MongoDB-D52B1E?logo=mongodb&logoColor=white" alt="MongoDB">
-  <img src="https://img.shields.io/badge/license-MIT-F6EEDC?labelColor=1A1410" alt="License: MIT">
+  <img src="https://img.shields.io/badge/status-beta-F4B41A?labelColor=1A1410" alt="Status: Beta">
+  <a href="https://github.com/HSchreier/yall-rtmp-docker-stream/pulls"><img src="https://img.shields.io/badge/PRs-welcome-D52B1E?labelColor=1A1410" alt="PRs Welcome"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-F6EEDC?labelColor=1A1410" alt="License: MIT"></a>
+</p>
+
+<p align="center">
+  <a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-D52B1E?logo=bun&logoColor=white" alt="Bun"></a>
+  <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-1A1410?logo=typescript&logoColor=F4B41A" alt="TypeScript"></a>
+  <a href="https://www.docker.com"><img src="https://img.shields.io/badge/Docker-EE7A1C?logo=docker&logoColor=white" alt="Docker"></a>
+  <a href="https://github.com/arut/nginx-rtmp-module"><img src="https://img.shields.io/badge/nginx--rtmp-1A1410?logo=nginx&logoColor=F4B41A" alt="nginx-rtmp-module"></a>
+  <a href="https://www.mongodb.com"><img src="https://img.shields.io/badge/MongoDB-D52B1E?logo=mongodb&logoColor=white" alt="MongoDB"></a>
 </p>
 
 # Ya'll Cast
 
 A single containerized agent that takes one RTMP ingest from OBS and relays it live, unmodified, to Mixcloud Live, YouTube, and Twitch at once. Per-user destination profiles (each with its own stream keys), one active broadcast at a time, auth-gated config, fully event-driven — no polling, no unscoped timers.
 
-## Status — first unstable release
+## Status — beta, relay build in progress
 
-**[v0.1.0-alpha.1](https://github.com/HSchreier/yall-rtmp-docker-stream/releases/tag/v0.1.0-alpha.1) — the RTMP relay itself does not exist yet.**
+**[v0.1.0-alpha.1](https://github.com/HSchreier/yall-rtmp-docker-stream/releases/tag/v0.1.0-alpha.1)** is the last tagged release; the RTMP relay itself has landed since on [`feature/rtmp-relay-dockerfile`](https://github.com/HSchreier/yall-rtmp-docker-stream/pull/5) (steps 1–4 of an 8-step build order, each independently verified end-to-end in a real running container, not just unit-tested) and is awaiting review before merge.
 
 | Built and verified | Not built yet |
 |---|---|
-| Auth (bootstrap admin, register, login) | `nginx-rtmp-module` relay itself |
-| Per-user destination profiles (Mixcloud/YouTube/Twitch keys) | `StreamState` / live "is it actually streaming" status |
-| One-active-profile activation, incl. admin-activate-for-anyone | Real-time status via SSE |
-| Full browser dashboard UI (not just a JSON API) | Docker image for the relay (no `Dockerfile` yet) |
-| Admin user-management table | |
+| Auth (bootstrap admin, register, login) | `StreamState` — live "is it actually streaming" status |
+| Per-user destination profiles (Mixcloud/YouTube/Twitch keys) | `StreamOrchestrator` + stats/idle-detection submodules |
+| One-active-profile activation, incl. admin-activate-for-anyone | Real-time status via SSE (`/events` is a placeholder) |
+| Full browser dashboard UI (not just a JSON API) | `docker-compose.yml`'s `relay` service (Dockerfile exists, not wired into compose yet) |
+| Admin user-management table, incl. self-service account editing | Real end-to-end ffmpeg test — the one that proves an nginx reload doesn't drop an already-live push |
+| **`Dockerfile`** — nginx + `nginx-rtmp-module` compiled in, multi-stage, build-time config self-test | Docker-build job in CI (the image builds and runs; nothing in CI builds it on every PR yet) |
+| **`NginxConfigRenderer`** — per-profile `nginx.conf` templating, buffer presets | |
+| **`IngestEventReceiver` + `RelayRouter`** — nginx's `on_publish`/`on_publish_done` webhooks, loopback-only | |
+| **`NginxProcessManager`** — spawns/supervises/crash-loops the real nginx process, verified against a real compiled image (register → activate a profile → confirm nginx comes up, `/stat` reporting real RTMP traffic) | |
 
-See the [release notes](https://github.com/HSchreier/yall-rtmp-docker-stream/releases/tag/v0.1.0-alpha.1) for the full breakdown and [`docs/TECHNICAL.md`](docs/TECHNICAL.md)'s "Open questions" section for what's still unresolved.
+See the [release notes](https://github.com/HSchreier/yall-rtmp-docker-stream/releases/tag/v0.1.0-alpha.1) and [`docs/TECHNICAL.md`](docs/TECHNICAL.md)'s "Build order" (§RTMP relay) and "Open questions" sections for the full, current breakdown.
 
 ## Quick start
 
@@ -48,7 +58,7 @@ cd yall-rtmp-docker-stream
 What that does, in order:
 1. Checks for Bun — installs it via the official installer if missing.
 2. Checks Docker is installed and running — stops with a clear message if not (this one's on you, it needs a GUI install/license).
-3. Copies `.env.example` → `.env` and fills in a freshly generated `JWT_SECRET`. Safe to re-run — won't touch an existing `.env`.
+3. Copies `.env.example` → `.env` and fills in freshly generated `JWT_SECRET`/`ENCRYPTION_KEY` values. Safe to re-run — won't touch an existing `.env`.
 4. Runs `bun install`.
 5. Starts Mongo (`docker compose up -d mongo`) on `localhost:27117`.
 
@@ -64,7 +74,7 @@ Open **http://localhost:8080** — first visit walks you through creating the ad
 
 ```bash
 docker compose up -d mongo        # Mongo 7, host-mapped to localhost:27117
-cp .env.example .env              # then fill in JWT_SECRET yourself, e.g.:
+cp .env.example .env              # then fill in JWT_SECRET and ENCRYPTION_KEY yourself, e.g.:
                                    #   openssl rand -hex 32
 bun install
 bun run dev                       # --watch, http://localhost:8080
@@ -78,6 +88,7 @@ Set in `.env` (never committed — `.env.example` is the template). `ConfigServi
 |---|---|---|
 | `MONGO_URI` | yes | Defaults to `mongodb://localhost:27117/yallcast-dev` — the sidecar runs on your host via `bun run dev`, not inside docker-compose, so it talks to Mongo's host-mapped port, not `mongo:27017`. |
 | `JWT_SECRET` | yes | Signs session tokens. `install.sh` generates one with `openssl rand -hex 32`; do the same if setting up by hand. |
+| `ENCRYPTION_KEY` | yes | 64 hex chars (32 bytes) for AES-256-GCM — encrypts destination stream keys at rest. A different key from `JWT_SECRET` on purpose (signing and at-rest encryption are different cryptographic purposes). `install.sh` generates this one too; by hand it's the same `openssl rand -hex 32`. |
 | `HTTP_PORT` | no (defaults to `8080`) | Where the dashboard/API listens. |
 
 Destination stream keys (Mixcloud/YouTube/Twitch) are **not** env vars — they live in Mongo, per user, set through the dashboard itself after you log in.
@@ -113,20 +124,33 @@ Editing `src/**/*.ts` (routes, services, repositories) does auto-restart via `--
 
 ```
 src/
-  bootstrap.ts              composition root — the only place that wires everything together
-  index.ts                  entrypoint
-  event-bus.ts               typed EventBus — all cross-module side effects go through this
-  events.ts                  the full EventMap (every event this app can emit)
-  errors.ts                  typed error hierarchy (ValidationError, AuthError, ...)
-  logger.ts                  Pino wrapper with secret-redaction paths
-  config-service.ts          validates env vars at startup
-  mongo-service.ts           Mongo connection, driven by real heartbeat events
+  bootstrap.ts               composition root — the only place that wires everything together
+  index.ts                   entrypoint
   http-api.ts                Bun.serve-based HTTP router (hand-rolled, no framework)
-  auth-service.ts             registration/login, bootstrap-then-admin-gated
-  user-repository.ts          user accounts
-  destination-profile-repository.ts   per-user Mixcloud/YouTube/Twitch profiles
-  relay-state-repository.ts   which single profile is currently "active"
-  static/                     the dashboard UI (plain HTML/CSS/JS, no build step)
+  infra/                     cross-cutting, imported by any module, never the reverse
+    event-bus.ts               typed EventBus — all cross-module side effects go through this
+    events.ts                  the full EventMap (every event this app can emit)
+    errors.ts                  typed error hierarchy (ValidationError, AuthError, ...)
+    logger.ts                  Pino wrapper with secret-redaction paths
+    config-service.ts          validates bootstrap env vars at startup
+    mongo-service.ts           Mongo connection, driven by real heartbeat events
+    crypto.ts                  AES-256-GCM for destination stream keys at rest
+    http.ts / http-session.ts  response helpers, cookie/bearer session extraction
+  modules/                   one folder per domain — router (+ service where needed) + repository
+    auth/                      registration/login, bootstrap-then-admin-gated
+    users/                     user accounts, admin management + self-service editing
+    profiles/                  per-user Mixcloud/YouTube/Twitch destination profiles
+    relay/                     the RTMP relay itself — see below
+      relay.repository.ts        which single profile is currently "active"
+      nginx-config-renderer.ts   renders nginx.conf from a profile + buffer preset
+      ingest-event-receiver.ts   validates nginx's on_publish/on_publish_done, emits Stream events
+      relay.router.ts            loopback-only HTTP routes for the two callbacks above
+      nginx-process-manager.ts   spawns/supervises/crash-loops the real nginx child process
+    health/                    /health
+  static/                    the dashboard UI (plain HTML/CSS/JS, no build step)
+docker/
+  nginx.conf.template        the template NginxConfigRenderer fills in per active profile
+Dockerfile                   3-stage build: nginx+rtmp-module, Bun sidecar compile, runtime
 scripts/
   install.sh                  one-shot local install (see Quick start)
   check-spec-sync.ts           openapi.yaml <-> TECHNICAL.md drift check
@@ -151,10 +175,12 @@ Full contract lives in [`openapi.yaml`](openapi.yaml) (kept in sync with `docs/T
 | `GET /profile` / `PUT /profile` | user | Your own destination profile (Mixcloud/YouTube/Twitch keys) |
 | `POST /profile/activate` | user | Make your profile the one active broadcast |
 | `GET /users` | admin | List every account, with role/profile/active status |
+| `PATCH /users/{userId}` | admin, or self for email/password | Edit an account — role changes are admin-only |
+| `DELETE /users/{userId}` | admin | Remove an account (cascades its destination profile) |
 | `POST /users/{userId}/activate` | admin | Activate any user's profile on their behalf |
 | `GET /health` | none | Mongo/nginx reachability, ingest status |
 | `GET /stats`, `GET /events` | — | Placeholders — `StreamState`/SSE aren't built yet |
-| `POST /internal/nginx/on-publish*` | internal | Webhook nginx will call once the relay exists |
+| `POST /internal/nginx/on-publish*` | internal, loopback-only | nginx-rtmp's own notify callbacks — validates the stream key against the active profile, emits `StreamStarted`/`StreamEnded` |
 
 ## Docs
 
@@ -187,7 +213,7 @@ A few things that'll save you a round-trip:
 
 Two workflows, both required on every PR into `staging` and on `staging → main`:
 
-- **[CI](.github/workflows/ci.yml)** — spec sync, lint (Biome), typecheck, unit tests, integration tests (against a real Mongo service container), compile (`bun build --compile`). No Docker-build job yet — there's no `Dockerfile` until the nginx-facing modules exist; a job that always fails because its input doesn't exist would be a permanent red X with no signal.
+- **[CI](.github/workflows/ci.yml)** — spec sync, lint (Biome), typecheck, unit tests, integration tests (against a real Mongo service container), compile (`bun build --compile`). No Docker-build job in this workflow yet — the `Dockerfile` itself builds and runs for real (nginx + `nginx-rtmp-module` compiled in, a build-time `nginx -t` self-test, the sidecar boots and actually spawns/supervises nginx — verified end-to-end in a live container, not just `docker build` succeeding), but the CI job that builds it on every PR hasn't been added yet — see `docs/TECHNICAL.md` §CI/CD pipeline for the planned shape (unconditional once added; the slower ffmpeg end-to-end suite stays a separate, path-filtered workflow, since it's where the one still-open question — does an nginx reload cleanly repoint an already-live push? — finally gets answered empirically).
 - **[Security](.github/workflows/security.yml)** — gitleaks (secret scan, full history), Semgrep (project-specific rules in `.semgrep/security.yml` — `updatedBy`/`registeredBy`/`activatedBy` must never come from a request body, not generic OWASP noise), Spectral (`.spectral.yaml` — every `openapi.yaml` operation must declare a `security` block).
 
 Branch flow: `feature/* → staging → main`, `staging` always green, `main` receives only deliberate merges. See `docs/TECHNICAL.md` §CI/CD pipeline for the full reasoning, including what these checks *can't* catch (the two conditional-auth cases documented in `openapi.yaml`'s own `info.description`).
@@ -196,7 +222,7 @@ Branch flow: `feature/* → staging → main`, `staging` always green, `main` re
 
 | Symptom | Fix |
 |---|---|
-| `ConfigService` throws listing missing env vars | `.env` is missing or incomplete — run `./scripts/install.sh` or copy `.env.example` and fill in `JWT_SECRET`. |
+| `ConfigService` throws listing missing env vars | `.env` is missing or incomplete — run `./scripts/install.sh` or copy `.env.example` and fill in `JWT_SECRET`/`ENCRYPTION_KEY`. |
 | Can't connect to Mongo | `docker compose up -d mongo` — check `docker ps` shows it on `27117`, not the default `27017`. |
 | Edited `src/static/*` but the browser doesn't reflect it | Static files aren't watched — restart `bun run dev` (see [Working on the frontend](#working-on-the-frontend)). |
 | `bun run test:integration` fails to connect | Needs the Mongo container running — same fix as above. Uses `MONGO_TEST_URI` if set, otherwise the same URI as dev. |
@@ -205,3 +231,10 @@ Branch flow: `feature/* → staging → main`, `staging` always green, `main` re
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+---
+
+> [!WARNING]
+> **This software is in BETA.** It relays your live broadcast to real destinations — test it on your own risk, and don't point it at anything you can't afford to have drop, glitch, or fail silently while you're still learning its edges. See [Status](#status--beta-relay-build-in-progress) above for exactly what's verified and what isn't yet.
+
+<p align="center">Shout out to the Mixcloud massif!</p>

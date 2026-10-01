@@ -27,6 +27,10 @@ declare module "*.svg" {
   const contents: string;
   export default contents;
 }
+declare module "*.template" {
+  const contents: string;
+  export default contents;
+}
 
 // Bun's file-loader import attribute (`with { type: "file" }`), for binary
 // assets (favicons) that can't go through the text loader above — resolves

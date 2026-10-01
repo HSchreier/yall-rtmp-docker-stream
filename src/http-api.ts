@@ -52,7 +52,7 @@ const settingsHtml = settingsHtmlRaw as unknown as string;
 const setupHtml = setupHtmlRaw as unknown as string;
 
 export interface ModuleRouter {
-  handle(req: Request, url: URL): Promise<Response | undefined>;
+  handle(req: Request, url: URL, clientIp: string | null): Promise<Response | undefined>;
 }
 
 interface HttpApiDeps {
@@ -108,7 +108,7 @@ export class HttpApi {
 
     this.#server = Bun.serve({
       port: this.deps.httpPort,
-      fetch: (req) => this.#handle(req),
+      fetch: (req, server) => this.#handle(req, server),
     });
     this.deps.logger.info(
       { port: this.deps.httpPort, staticAssets: this.#assets.size },
@@ -120,10 +120,11 @@ export class HttpApi {
     this.#server?.stop();
   }
 
-  async #handle(req: Request): Promise<Response> {
+  async #handle(req: Request, server: ReturnType<typeof Bun.serve>): Promise<Response> {
     const url = new URL(req.url);
     try {
-      return await this.#route(req, url);
+      const clientIp = server.requestIP(req)?.address ?? null;
+      return await this.#route(req, url, clientIp);
     } catch (err) {
       if (err instanceof AppError) {
         return jsonResponse(err.status, { error: { code: err.code, message: err.message } });
@@ -136,7 +137,7 @@ export class HttpApi {
     }
   }
 
-  async #route(req: Request, url: URL): Promise<Response> {
+  async #route(req: Request, url: URL, clientIp: string | null): Promise<Response> {
     const { pathname } = url;
 
     if (pathname === "/" && req.method === "GET") {
@@ -171,7 +172,7 @@ export class HttpApi {
     }
 
     for (const router of this.deps.routers) {
-      const response = await router.handle(req, url);
+      const response = await router.handle(req, url, clientIp);
       if (response) return response;
     }
 
