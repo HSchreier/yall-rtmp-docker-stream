@@ -187,7 +187,7 @@ A few things that'll save you a round-trip:
 
 Two workflows, both required on every PR into `staging` and on `staging → main`:
 
-- **[CI](.github/workflows/ci.yml)** — spec sync, lint (Biome), typecheck, unit tests, integration tests (against a real Mongo service container), compile (`bun build --compile`). No Docker-build job yet — there's no `Dockerfile` until the nginx-facing modules exist; a job that always fails because its input doesn't exist would be a permanent red X with no signal.
+- **[CI](.github/workflows/ci.yml)** — spec sync, lint (Biome), typecheck, unit tests, integration tests (against a real Mongo service container), compile (`bun build --compile`). No Docker-build job in this workflow yet — the `Dockerfile` itself now exists and builds/runs (verified: `nginx-rtmp-module` compiles in, the sidecar boots), but the CI job that builds it on every PR hasn't been added — see `docs/TECHNICAL.md` §CI/CD pipeline for the planned shape (unconditional once added; the slower ffmpeg end-to-end suite stays a separate, path-filtered workflow).
 - **[Security](.github/workflows/security.yml)** — gitleaks (secret scan, full history), Semgrep (project-specific rules in `.semgrep/security.yml` — `updatedBy`/`registeredBy`/`activatedBy` must never come from a request body, not generic OWASP noise), Spectral (`.spectral.yaml` — every `openapi.yaml` operation must declare a `security` block).
 
 Branch flow: `feature/* → staging → main`, `staging` always green, `main` receives only deliberate merges. See `docs/TECHNICAL.md` §CI/CD pipeline for the full reasoning, including what these checks *can't* catch (the two conditional-auth cases documented in `openapi.yaml`'s own `info.description`).
