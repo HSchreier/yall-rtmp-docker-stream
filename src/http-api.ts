@@ -1,74 +1,94 @@
 // HttpApi — docs/TECHNICAL.md §Sidecar software design + §Error handling +
-// §Frontend & first install. Built on Bun.serve, hand-rolled routing, no
-// framework. Centralized error wrapper: AppError subclasses map to their
-// status; anything else is a generic 500 with no internal detail leaked to
-// the client, full detail to the logger.
+// §Frontend & first install. Built on Bun.serve, no framework. Owns only
+// three things: serving the static dashboard pages, deciding where "/"
+// redirects, and dispatching everything else to the module router that
+// matches — auth, users, profiles, health. Each of those owns its own
+// routes and talks only to its own service; this class makes no domain
+// decisions itself.
 //
-// Static pages (setup/login/dashboard + app.js/app.css + the Modernist
-// stylesheet) are read once at init() and served from memory — see
-// docs/TECHNICAL.md's "read once at startup" design.
+// Centralized error wrapper: AppError subclasses map to their status;
+// anything else is a generic 500 with no internal detail leaked to the
+// client, full detail to the logger.
 //
-// TODAY'S SLICE — enough to actually use end-to-end, not the full route
-// set from openapi.yaml yet: /health, /auth/register, /auth/login,
-// /auth/logout, /me, /profile (GET/PUT), /profile/activate,
-// /users/:userId/activate, plus the static pages and root routing. Two
-// routes (/me, /auth/logout) exist here but aren't in openapi.yaml yet —
-// discovered as genuinely necessary while building the UI (a browser needs
-// a way to know who's logged in, and to clear an HttpOnly cookie it can't
-// touch itself); openapi.yaml needs updating to match, not done yet.
-//
-// Missing vs. openapi.yaml still: /stats, /events (SSE), the internal
-// nginx-notify routes — those need StreamState/NginxProcessManager, which
-// don't exist yet. /health still hardcodes ingestStatus/nginxReachable.
-//
-// No request-body schema validation beyond what AuthService/repositories
-// already do internally — a validation library is a follow-up.
+// Static pages (setup/login/dashboard + app.js/template.js/app.css + the
+// Modernist stylesheet) are imported as text at *build* time — not read
+// from disk in init() — and embedded directly into the module graph. This
+// isn't just a style choice: `Bun.file(new URL(path, import.meta.url))`
+// does NOT get embedded by `bun build --compile` (confirmed by actually
+// running the compiled binary from a directory with no src/ present — it
+// throws `ENOENT ... /$bunfs/root/static/setup.html`, a real bug that
+// would have silently broken every Docker deployment). A `with { type:
+// "text" }` import is what `--compile` actually embeds; see
+// src/types/text-assets.d.ts for the ambient module declarations tsc
+// needs to type these. Side benefit: `bun --watch` now picks up edits to
+// these files too, since they're real imports in the module graph —
+// no more needing a manual restart after touching src/static/*.
 
-import type { AuthService, JwtPayload, RegisterInput } from "./auth-service.ts";
-import type {
-  DestinationProfileRepository,
-  DestinationProfileUpdate,
-} from "./destination-profile-repository.ts";
-import { AppError, AuthError, ValidationError } from "./errors.ts";
-import type { Logger } from "./logger.ts";
-import type { MongoService } from "./mongo-service.ts";
-import type { RelayStateRepository } from "./relay-state-repository.ts";
-import type { UserRepository } from "./user-repository.ts";
+import markSvg from "../assets/brand/mark.svg" with { type: "text" };
+import mark32Path from "../assets/brand/mark-32.png" with { type: "file" };
+import mark180Path from "../assets/brand/mark-180.png" with { type: "file" };
+import modernistCss from "../assets/design-system/modernist/styles.css" with { type: "text" };
+import { AppError } from "./infra/errors.ts";
+import { jsonResponse, redirect } from "./infra/http.ts";
+import { tryAuth } from "./infra/http-session.ts";
+import type { Logger } from "./infra/logger.ts";
+import type { AuthService } from "./modules/auth/auth.service.ts";
+import type { UserRepository } from "./modules/users/users.repository.ts";
+import appCss from "./static/app.css" with { type: "text" };
+import appJs from "./static/app.js" with { type: "text" };
+// Cast to string: bun-types claims *.html for its own unrelated HTMLBundle
+// dev-server feature, so tsc sees these as HTMLBundle even though Bun's
+// bundler actually resolves them as plain text at both dev and compile
+// time per the `type: "text"` attribute — see text-assets.d.ts.
+import dashboardHtmlRaw from "./static/dashboard.html" with { type: "text" };
+import loginHtmlRaw from "./static/login.html" with { type: "text" };
+import settingsHtmlRaw from "./static/settings.html" with { type: "text" };
+import setupHtmlRaw from "./static/setup.html" with { type: "text" };
+import templateJs from "./static/template.js" with { type: "text" };
+
+const dashboardHtml = dashboardHtmlRaw as unknown as string;
+const loginHtml = loginHtmlRaw as unknown as string;
+const settingsHtml = settingsHtmlRaw as unknown as string;
+const setupHtml = setupHtmlRaw as unknown as string;
+
+export interface ModuleRouter {
+  handle(req: Request, url: URL): Promise<Response | undefined>;
+}
 
 interface HttpApiDeps {
   auth: AuthService;
   users: UserRepository;
-  destinationProfiles: DestinationProfileRepository;
-  relayState: RelayStateRepository;
-  mongo: MongoService;
+  routers: ModuleRouter[];
   logger: Logger;
   httpPort: number;
 }
 
 interface StaticAsset {
-  body: string;
+  body: string | ArrayBuffer;
   contentType: string;
 }
 
-const ACTIVATE_USER_RE = /^\/users\/([^/]+)\/activate$/;
-const STATIC_DIR = new URL("./static/", import.meta.url);
-const MODERNIST_CSS_PATH = new URL("../assets/design-system/modernist/styles.css", import.meta.url);
+const STATIC_FILES: Array<{ route: string; body: string; contentType: string }> = [
+  { route: "/setup.html", body: setupHtml, contentType: "text/html" },
+  { route: "/login.html", body: loginHtml, contentType: "text/html" },
+  { route: "/dashboard.html", body: dashboardHtml, contentType: "text/html" },
+  { route: "/settings.html", body: settingsHtml, contentType: "text/html" },
+  { route: "/app.js", body: appJs, contentType: "application/javascript" },
+  { route: "/template.js", body: templateJs, contentType: "application/javascript" },
+  { route: "/app.css", body: appCss, contentType: "text/css" },
+  { route: "/modernist.css", body: modernistCss, contentType: "text/css" },
+  { route: "/mark.svg", body: markSvg, contentType: "image/svg+xml" },
+];
 
-const STATIC_FILES: Array<{ route: string; file: URL; contentType: string }> = [
-  { route: "/setup.html", file: new URL("setup.html", STATIC_DIR), contentType: "text/html" },
-  { route: "/login.html", file: new URL("login.html", STATIC_DIR), contentType: "text/html" },
-  {
-    route: "/dashboard.html",
-    file: new URL("dashboard.html", STATIC_DIR),
-    contentType: "text/html",
-  },
-  {
-    route: "/app.js",
-    file: new URL("app.js", STATIC_DIR),
-    contentType: "application/javascript",
-  },
-  { route: "/app.css", file: new URL("app.css", STATIC_DIR), contentType: "text/css" },
-  { route: "/modernist.css", file: MODERNIST_CSS_PATH, contentType: "text/css" },
+// Binary assets can't use the text loader — `with { type: "file" }` embeds
+// the raw bytes in the compiled binary and gives back a path string;
+// Bun.file() reads the actual bytes back from it at runtime. Verified with
+// a minimal reproduction (embed a real PNG, run the compiled binary from a
+// directory with no source file present, confirm the byte count matches)
+// before wiring this in, same as the text-asset fix above.
+const BINARY_STATIC_FILES: Array<{ route: string; path: string; contentType: string }> = [
+  { route: "/mark-32.png", path: mark32Path, contentType: "image/png" },
+  { route: "/mark-180.png", path: mark180Path, contentType: "image/png" },
 ];
 
 export class HttpApi {
@@ -78,8 +98,11 @@ export class HttpApi {
   constructor(private readonly deps: HttpApiDeps) {}
 
   async init(): Promise<void> {
-    for (const { route, file, contentType } of STATIC_FILES) {
-      const body = await Bun.file(file).text();
+    for (const { route, body, contentType } of STATIC_FILES) {
+      this.#assets.set(route, { body, contentType });
+    }
+    for (const { route, path, contentType } of BINARY_STATIC_FILES) {
+      const body = await Bun.file(path).arrayBuffer();
       this.#assets.set(route, { body, contentType });
     }
 
@@ -127,105 +150,29 @@ export class HttpApi {
       return this.#serveAsset("/setup.html");
     }
 
+    if (pathname === "/login.html" && req.method === "GET") {
+      // Symmetric with /setup.html above — reaching /login.html directly
+      // (bookmark, back button, a stale tab) with no admin yet would
+      // otherwise show a login form with nothing to log into.
+      if (await this.deps.users.isEmpty()) {
+        return redirect("/setup.html");
+      }
+      return this.#serveAsset("/login.html");
+    }
+
     const staticAsset = this.#assets.get(pathname);
-    if (staticAsset && req.method === "GET" && pathname !== "/setup.html") {
+    if (
+      staticAsset &&
+      req.method === "GET" &&
+      pathname !== "/setup.html" &&
+      pathname !== "/login.html"
+    ) {
       return this.#serveAsset(pathname);
     }
 
-    if (pathname === "/health" && req.method === "GET") {
-      return jsonResponse(200, {
-        ingestStatus: "offline",
-        nginxReachable: false,
-        mongoReachable: this.deps.mongo.isConnected(),
-        at: new Date().toISOString(),
-      });
-    }
-
-    if (pathname === "/me" && req.method === "GET") {
-      const session = this.#requireAuth(req);
-      const user = await this.deps.users.findById(session.userId);
-      if (!user) throw new AuthError();
-      return jsonResponse(200, { userId: user.userId, email: user.email, role: user.role });
-    }
-
-    if (pathname === "/users" && req.method === "GET") {
-      const session = this.#requireAuth(req);
-      this.deps.auth.requireAdmin(session);
-      const [users, activeUserId] = await Promise.all([
-        this.deps.users.list(),
-        this.deps.relayState.getActiveUserId(),
-      ]);
-      const rows = await Promise.all(
-        users.map(async (u) => ({
-          userId: u.userId,
-          email: u.email,
-          role: u.role,
-          // passwordHash deliberately excluded — same _id-leak lesson as
-          // DestinationProfileRepository.get(): never return the whole
-          // stored document just because it was convenient to.
-          hasProfile: await this.deps.destinationProfiles.exists(u.userId),
-          isActive: u.userId === activeUserId,
-        })),
-      );
-      return jsonResponse(200, { users: rows });
-    }
-
-    if (pathname === "/auth/register" && req.method === "POST") {
-      const body = await readJson<RegisterInput>(req);
-      const actingUser = this.#tryAuth(req);
-      const result = await this.deps.auth.register(body, actingUser);
-      return jsonResponse(200, result);
-    }
-
-    if (pathname === "/auth/login" && req.method === "POST") {
-      const body = await readJson<{ email: string; password: string }>(req);
-      const { token } = await this.deps.auth.login(body.email, body.password);
-      const res = jsonResponse(200, { token });
-      res.headers.append("Set-Cookie", sessionCookie(token));
-      return res;
-    }
-
-    if (pathname === "/auth/logout" && req.method === "POST") {
-      const res = jsonResponse(200, { ok: true });
-      res.headers.append("Set-Cookie", sessionCookie("", 0));
-      return res;
-    }
-
-    if (pathname === "/profile" && req.method === "GET") {
-      const user = this.#requireAuth(req);
-      const doc = await this.deps.destinationProfiles.get(user.userId);
-      if (!doc) {
-        return jsonResponse(404, { error: { code: "NOT_FOUND", message: "No profile yet" } });
-      }
-      return jsonResponse(200, doc);
-    }
-
-    if (pathname === "/profile" && req.method === "PUT") {
-      const user = this.#requireAuth(req);
-      const body = await readJson<DestinationProfileUpdate>(req);
-      const doc = await this.deps.destinationProfiles.upsert(user.userId, body, user.userId);
-      return jsonResponse(200, doc);
-    }
-
-    if (pathname === "/profile/activate" && req.method === "POST") {
-      const user = this.#requireAuth(req);
-      await this.deps.relayState.setActive(user.userId, user.userId);
-      return jsonResponse(200, {
-        activeUserId: user.userId,
-        activatedAt: new Date().toISOString(),
-      });
-    }
-
-    const activateMatch = pathname.match(ACTIVATE_USER_RE);
-    const targetUserId = activateMatch?.[1];
-    if (targetUserId && req.method === "POST") {
-      const user = this.#requireAuth(req);
-      this.deps.auth.requireAdmin(user);
-      await this.deps.relayState.setActive(targetUserId, user.userId);
-      return jsonResponse(200, {
-        activeUserId: targetUserId,
-        activatedAt: new Date().toISOString(),
-      });
+    for (const router of this.deps.routers) {
+      const response = await router.handle(req, url);
+      if (response) return response;
     }
 
     return jsonResponse(404, { error: { code: "NOT_FOUND", message: "No such route" } });
@@ -235,7 +182,7 @@ export class HttpApi {
     if (await this.deps.users.isEmpty()) {
       return redirect("/setup.html");
     }
-    const session = this.#tryAuth(req);
+    const session = tryAuth(req, this.deps.auth);
     return redirect(session ? "/dashboard.html" : "/login.html");
   }
 
@@ -243,45 +190,5 @@ export class HttpApi {
     const asset = this.#assets.get(pathname);
     if (!asset) throw new Error(`static asset not loaded: ${pathname}`);
     return new Response(asset.body, { headers: { "content-type": asset.contentType } });
-  }
-
-  #requireAuth(req: Request): JwtPayload {
-    const user = this.#tryAuth(req);
-    if (!user) throw new AuthError();
-    return user;
-  }
-
-  #tryAuth(req: Request): JwtPayload | null {
-    const authHeader = req.headers.get("authorization");
-    if (authHeader?.startsWith("Bearer ")) {
-      return this.deps.auth.verifyToken(authHeader.slice(7));
-    }
-    const cookieHeader = req.headers.get("cookie");
-    const match = cookieHeader?.match(/(?:^|;\s*)session=([^;]+)/);
-    const token = match?.[1];
-    return token ? this.deps.auth.verifyToken(token) : null;
-  }
-}
-
-function sessionCookie(token: string, maxAgeSeconds = 43200): string {
-  return `session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAgeSeconds}`;
-}
-
-function redirect(location: string): Response {
-  return new Response(null, { status: 302, headers: { location } });
-}
-
-function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
-}
-
-async function readJson<T>(req: Request): Promise<T> {
-  try {
-    return (await req.json()) as T;
-  } catch {
-    throw new ValidationError("Malformed JSON body");
   }
 }

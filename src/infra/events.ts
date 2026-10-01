@@ -32,6 +32,17 @@ export interface ActiveProfileChanged {
   activatedBy: string;
   at: Date;
 }
+export interface UserUpdated {
+  userId: string;
+  changedFields: Array<"email" | "role" | "password">;
+  updatedBy: string;
+  at: Date;
+}
+export interface UserRemoved {
+  userId: string;
+  removedBy: string;
+  at: Date;
+}
 
 // Client events — RTMP connection lifecycle below the level of an authorized publish
 export interface IngestClientConnected {
@@ -103,6 +114,8 @@ export interface EventMap {
   UserRegistered: UserRegistered;
   DestinationCredentialsUpdated: DestinationCredentialsUpdated;
   ActiveProfileChanged: ActiveProfileChanged;
+  UserUpdated: UserUpdated;
+  UserRemoved: UserRemoved;
   IngestClientConnected: IngestClientConnected;
   IngestClientDisconnected: IngestClientDisconnected;
   StreamStarted: StreamStarted;

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { EventBus } from "../../src/event-bus.ts";
-import { Logger } from "../../src/logger.ts";
+import { EventBus } from "../../src/infra/event-bus.ts";
+import { Logger } from "../../src/infra/logger.ts";
 
 describe("EventBus", () => {
   test("delivers a payload to a listener", () => {

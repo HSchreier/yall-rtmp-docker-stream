@@ -4,22 +4,28 @@
 // gets called for a singleton.
 //
 // Current slice: Logger, the process-level safety net, EventBus,
-// ConfigService, MongoService, the three repositories, AuthService, and a
-// first-cut HttpApi. Still missing vs. docs/TECHNICAL.md's module list:
-// StreamState, the nginx-facing modules (NginxConfigRenderer,
-// NginxProcessManager, IngestEventReceiver), HealthService, StreamOrchestrator
-// and its submodules, AuditLogger — added incrementally, bottom-up by
-// dependency.
+// ConfigService, MongoService, the three repositories, their owning
+// services, AuthService, the module routers, and a first-cut HttpApi.
+// Still missing vs. docs/TECHNICAL.md's module list: StreamState, the
+// nginx-facing modules (NginxConfigRenderer, NginxProcessManager,
+// IngestEventReceiver), HealthService, StreamOrchestrator and its
+// submodules, AuditLogger — added incrementally, bottom-up by dependency.
 
-import { AuthService } from "./auth-service.ts";
-import { ConfigService } from "./config-service.ts";
-import { DestinationProfileRepository } from "./destination-profile-repository.ts";
-import { EventBus } from "./event-bus.ts";
-import { HttpApi } from "./http-api.ts";
-import { Logger } from "./logger.ts";
-import { MongoService } from "./mongo-service.ts";
-import { RelayStateRepository } from "./relay-state-repository.ts";
-import { UserRepository } from "./user-repository.ts";
+import { HttpApi, type ModuleRouter } from "./http-api.ts";
+import { ConfigService } from "./infra/config-service.ts";
+import { EventBus } from "./infra/event-bus.ts";
+import { Logger } from "./infra/logger.ts";
+import { MongoService } from "./infra/mongo-service.ts";
+import { AuthRouter } from "./modules/auth/auth.router.ts";
+import { AuthService } from "./modules/auth/auth.service.ts";
+import { HealthRouter } from "./modules/health/health.router.ts";
+import { DestinationProfileRepository } from "./modules/profiles/profiles.repository.ts";
+import { ProfilesRouter } from "./modules/profiles/profiles.router.ts";
+import { ProfileService } from "./modules/profiles/profiles.service.ts";
+import { RelayStateRepository } from "./modules/relay/relay.repository.ts";
+import { UserRepository } from "./modules/users/users.repository.ts";
+import { UsersRouter } from "./modules/users/users.router.ts";
+import { UsersService } from "./modules/users/users.service.ts";
 
 export interface App {
   readonly logger: Logger;
@@ -67,7 +73,11 @@ export async function bootstrap(): Promise<App> {
 
   const users = new UserRepository(mongo.db());
   await users.init();
-  const destinationProfiles = new DestinationProfileRepository(mongo.db(), eventBus);
+  const destinationProfiles = new DestinationProfileRepository(
+    mongo.db(),
+    eventBus,
+    config.get().encryptionKey,
+  );
   await destinationProfiles.init();
   const relayState = new RelayStateRepository(mongo.db(), eventBus);
 
@@ -75,14 +85,27 @@ export async function bootstrap(): Promise<App> {
   // per-call behavior.
   const auth = new AuthService(users, eventBus, config.get().jwtSecret);
 
-  // Step 4: HttpApi last — binds the listener only once everything it might
-  // touch on an incoming request is already up.
+  // Step 4: the service objects that orchestrate across more than one
+  // repository — UsersService (list-with-status, admin activation) and
+  // ProfileService (own-profile activation). Routers below talk only to
+  // these, never to a repository directly.
+  const usersService = new UsersService(users, destinationProfiles, relayState, eventBus);
+  const profileService = new ProfileService(destinationProfiles, relayState);
+
+  // Step 5: module routers — each owns its own routes and its own service.
+  const routers: ModuleRouter[] = [
+    new AuthRouter(auth, users),
+    new UsersRouter(usersService, auth),
+    new ProfilesRouter(profileService, auth),
+    new HealthRouter(mongo),
+  ];
+
+  // Step 6: HttpApi last — binds the listener only once everything it
+  // might touch on an incoming request is already up.
   const httpApi = new HttpApi({
     auth,
     users,
-    destinationProfiles,
-    relayState,
-    mongo,
+    routers,
     logger,
     httpPort: config.get().httpPort,
   });

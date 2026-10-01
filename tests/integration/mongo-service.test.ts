@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { Logger } from "../../src/logger.ts";
-import { MongoService } from "../../src/mongo-service.ts";
+import { Logger } from "../../src/infra/logger.ts";
+import { MongoService } from "../../src/infra/mongo-service.ts";
 
 // Requires a live MongoDB reachable at MONGO_TEST_URI. Not part of the
 // no-external-services unit tier — see docs/TECHNICAL.md §Testing strategy,
