@@ -6,10 +6,14 @@ services:
     volumes:
       - mongo-data:/data/db
 
-  # relay service (nginx + compiled sidecar) isn't added here yet — there's
-  # no Dockerfile until NginxConfigRenderer/NginxProcessManager exist, per
-  # docs/TECHNICAL.md's build order. For now, run the sidecar directly with
-  # `bun run dev` against this mongo service (MONGO_URI=mongodb://localhost:27117/...).
+  # relay service (nginx + compiled sidecar) isn't added here yet — the
+  # Dockerfile exists and builds/runs standalone (verified: nginx-rtmp-
+  # module compiles in, the sidecar boots and connects out to this mongo
+  # service via host.docker.internal), but NginxConfigRenderer/
+  # NginxProcessManager don't exist yet, so nginx inside that image is
+  # never actually started — see docs/TECHNICAL.md's build order, step 7.
+  # For now, run the sidecar directly with `bun run dev` against this mongo
+  # service (MONGO_URI=mongodb://localhost:27117/...).
 
 volumes:
   mongo-data:
