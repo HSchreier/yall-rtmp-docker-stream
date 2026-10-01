@@ -53,6 +53,19 @@ The `ingest` application also configures nginx-rtmp's `notify` module: `on_publi
 
 Defaulting to `mobile` is a deliberate choice, not nginx's own default: a streamer who hasn't thought about their connection quality is more likely to be hurt by a destination getting dropped over a brief stall than by the extra ~13s of added tolerance (and modest latency cost) the wider preset costs them. `stable` is there to opt into once someone knows their connection doesn't need the cushion.
 
+**Known nginx-rtmp-module compile risk — checked before writing the Dockerfile, not discovered by a failed build.** `nginx-rtmp-module` (last real release Dec 2024, `arut/nginx-rtmp-module` tag `v1.2.2`) has open GitHub issues (#1517, #1569, #1579) describing a build failure against recent nginx/GCC: an `implicit-fallthrough` warning in `ngx_rtmp_eval.c` gets promoted to a hard error, since nginx's own build system sets `-Werror` by default with modern compilers. Naively pinning current nginx stable (1.30.5) breaks the build. Fix: `./configure --with-cc-opt="-Wno-error=implicit-fallthrough"` — scoped to that one warning, not a blanket `-Werror` disable. To be verified the same way every other claim in this doc has been: actually run `docker build`, not assumed to work because the flag looks right.
+
+**Build order — dependency-first, each step independently testable before the next depends on it:**
+
+1. **`Dockerfile`** (repo root) — multi-stage: compile nginx + `nginx-rtmp-module` (pinned versions, the fix above), compile the Bun binary (`bun build --compile`, already proven to need the build-time asset-embedding approach — see Frontend & first install), minimal final runtime image. Verified by `docker build` succeeding, then a bare smoke test: `nginx -V` lists the rtmp module, the container binds `:1935`.
+2. **`src/modules/relay/nginx-config-renderer.ts`** — pure string templating, the four-placeholder `envsubst` design above, now including the `bufferProfile` → `out_queue`/`out_cork`/`relay_buffer` mapping. No Docker needed to unit-test this; it's string in, string out.
+3. **`src/modules/relay/ingest-event-receiver.ts`** + `relay.router.ts` — the `on_publish`/`on_publish_done` handlers (`/internal/nginx/on-publish*`, already stubbed in `openapi.yaml`, loopback-only). Also fully unit-testable without real nginx — it's HTTP plus a `DestinationProfileRepository`/`RelayStateRepository` lookup, same shape as every other router in this codebase.
+4. **`src/modules/relay/nginx-process-manager.ts`** — spawn/supervise/crash-loop, the domain-singleton getter/private-setter shape already used by `MongoService`. Core state-tracking logic (crash counting, `isRunning()`) unit-testable with a fake `child_process`; actually starting/reloading needs the real binary from step 1.
+5. **`src/modules/relay/stream-state.ts`** — EventBus-driven, same shape as `MongoService`/`NginxProcessManager`. Fully unit-testable with a fake EventBus, same pattern as the existing `event-bus.test.ts`.
+6. **`src/modules/relay/stream-orchestrator.ts`** + `stream-stats-session.ts` + `stream-idle-detector.ts` — unit-testable with fake injected submodule factories; the `.dispose()`-called-on-both-`StreamEnded`-and-`nginx.crashed` guarantee (and double-dispose not double-firing) gets direct coverage here, not incidental coverage via something else.
+7. Wire all of the above into `bootstrap.ts`, in this same dependency order.
+8. **Real end-to-end**: add the `relay` service to `docker-compose.yml`, push a synthetic `ffmpeg` test stream at a running container. This is where the still-open `[Elevated priority]` question — does `nginx -s reload` actually repoint an already-live publish's `push` targets? — finally gets answered empirically, which is also the gate on whether the reactive-buffer idea above is even worth revisiting later.
+
 ### Control/health sidecar: Bun + TypeScript
 
 Runs as a second process in the same container, responsible for everything that isn't the RTMP data path itself:
@@ -340,8 +353,8 @@ Two tiers, not Stagebox's three (`feature → deployable → staging → main`) 
 
 **Still not real, deliberately, not by oversight:**
 
-8. **Docker build** — no job for this yet. There's no `Dockerfile` until the nginx-facing modules exist; a CI job that always fails because its input doesn't exist would be a permanent red X with no signal, worse than not having the job.
-9. **The docker-compose + synthetic-ffmpeg-stream integration suite** (relaying an actual test stream and asserting the push fan-out) — same reason, waits on the same missing pieces.
+8. **Docker build** — planned as an unconditional job in `ci.yml` once the `Dockerfile` exists (RTMP relay §Build order, step 1): `docker build .`, fast, catches a broken build (e.g. the known `nginx-rtmp-module` compile risk above) immediately on every PR, same as every other required check.
+9. **The docker-compose + synthetic-ffmpeg-stream integration suite** (relaying an actual test stream and asserting the push fan-out, RTMP relay §Build order step 8) — **not** added to the existing required checks. Deliberately a separate workflow, path-filtered to only run when `Dockerfile`/`src/modules/relay/**`/nginx config files change: it needs a full nginx compile plus `ffmpeg`, meaningfully slower than everything else in `ci.yml`, and gating an unrelated docs/frontend PR on it would be exactly the kind of cost/signal mismatch this project has avoided everywhere else (see `check-spec-sync.ts`'s own "zero dependencies" reasoning).
 10. **Spec coverage** (fails if any `openapi.yaml` path has no route handler, or vice versa) — `check-spec-sync.ts` only checks the two *documents* against each other; this would be the piece that catches code drifting from the spec, and there's real code to drift against now, but it isn't built yet.
 11. **Contract tests** — asserting actual HTTP responses match `openapi.yaml`'s schemas (e.g. via `openapi-response-validator`), not just that the design intends them to.
 
