@@ -53,7 +53,28 @@ The `ingest` application also configures nginx-rtmp's `notify` module: `on_publi
 
 Defaulting to `mobile` is a deliberate choice, not nginx's own default: a streamer who hasn't thought about their connection quality is more likely to be hurt by a destination getting dropped over a brief stall than by the extra ~13s of added tolerance (and modest latency cost) the wider preset costs them. `stable` is there to opt into once someone knows their connection doesn't need the cushion.
 
-**Known nginx-rtmp-module compile risk — checked before writing the Dockerfile, not discovered by a failed build.** `nginx-rtmp-module` (last real release Dec 2024, `arut/nginx-rtmp-module` tag `v1.2.2`) has open GitHub issues (#1517, #1569, #1579) describing a build failure against recent nginx/GCC: an `implicit-fallthrough` warning in `ngx_rtmp_eval.c` gets promoted to a hard error, since nginx's own build system sets `-Werror` by default with modern compilers. Naively pinning current nginx stable (1.30.5) breaks the build. Fix: `./configure --with-cc-opt="-Wno-error=implicit-fallthrough"` — scoped to that one warning, not a blanket `-Werror` disable. To be verified the same way every other claim in this doc has been: actually run `docker build`, not assumed to work because the flag looks right.
+**Known nginx-rtmp-module compile risk — checked before writing the Dockerfile, not discovered by a failed build.** `nginx-rtmp-module` (last real release Dec 2024, `arut/nginx-rtmp-module` tag `v1.2.2`) has open GitHub issues (#1517, #1569, #1579) describing a build failure against recent nginx/GCC: an `implicit-fallthrough` warning in `ngx_rtmp_eval.c` gets promoted to a hard error, since nginx's own build system sets `-Werror` by default with modern compilers. Naively pinning current nginx stable (1.30.5) breaks the build. Fix: `./configure --with-cc-opt="-Wno-error=implicit-fallthrough"` — scoped to that one warning, not a blanket `-Werror` disable. **Verified, not just argued for**: `docker build` actually succeeds with this flag (confirmed before writing any of the below as settled).
+
+**GCC compilation — what actually happens, and why it's a completely separate toolchain from Bun.** nginx and `nginx-rtmp-module` are C, not JavaScript/TypeScript — `bun build --compile` only bundles a Bun/JS/TS application plus the Bun runtime into one executable; it has no capability to compile C source at all, and isn't being asked to here. The `Dockerfile`'s first stage (`nginx-build`, `FROM debian:bookworm-slim`) is a real, separate GCC-based C toolchain build, unrelated to the second stage's Bun compile:
+
+- **`build-essential`** — Debian's standard meta-package: GCC, G++, `make`, `libc6-dev`, `dpkg-dev`. This is the actual compiler; nothing Bun-related is present in this stage at all.
+- **`libpcre3-dev`** — PCRE headers/static libs, needed because nginx core uses PCRE for regex (location/rewrite matching) even though this build doesn't define any `location` blocks using regex — it's a core nginx build dependency, not something enabled by an explicit flag.
+- **`zlib1g-dev`** — gzip support, same situation: a core nginx build dependency, linked whether or not this config happens to use gzip.
+- **`libssl-dev`** — included as a standard nginx build dependency. Worth flagging honestly rather than asserting a confident reason: `--with-http_ssl_module` was **not** passed to `./configure`, yet the built binary's own `nginx -V` output reports `built with OpenSSL 3.0.22` anyway — nginx's core apparently links OpenSSL for something even without the SSL module explicitly enabled (possibly a core crypto/digest utility, not confirmed against nginx's own `configure` script source). Observed, not fully explained; removing `libssl-dev` to see if the build still succeeds wasn't tried, so it stays.
+- **`curl`**, **`git`**, **`ca-certificates`** — fetching nginx's source tarball and cloning the rtmp module's pinned tag over HTTPS.
+
+**The actual compile**, after both sources are fetched into `/build`:
+```
+./configure \
+  --prefix=/usr/local/nginx \
+  --with-cc-opt="-Wno-error=implicit-fallthrough" \
+  --add-module=/build/nginx-rtmp-module
+make -j"$(nproc)"
+make install
+```
+`--add-module` compiles `nginx-rtmp-module` **statically into the nginx binary itself** — not a dynamically-loaded `.so` (nginx does support `--add-dynamic-module`, deliberately not used here: one binary with the module baked in is simpler to verify and ship than a binary plus a separate module file that has to be loaded correctly at runtime). `make install` puts the result at `/usr/local/nginx/sbin/nginx`, which only the final runtime stage's `COPY --from=nginx-build` ever touches again — the entire `build-essential`/`-dev` toolchain stays behind in the discarded build stage, never reaching the shipped image (confirmed: the final image's installed packages are only the *runtime* `-dev`-less equivalents — `libpcre3`, `zlib1g`, `libssl3` — plus `curl`/`gettext-base` for the healthcheck and `NginxConfigRenderer`'s future `envsubst` call).
+
+**Known minor inefficiency, not fixed**: the Dockerfile currently runs two separate `apt-get update && apt-get install` layers in the `nginx-build` stage — the compiler toolchain first, then `gettext-base` later for the build-time self-test. Combining them into one `RUN` would save a layer and a package-index refetch; left as two because the self-test was added after the initial compile step was already written and working, and splitting it out made the diff between "compile nginx" and "verify the config template" clearer while this was being built and debugged. Worth squashing before this image is actually optimized for size, not before.
 
 **Build order — dependency-first, each step independently testable before the next depends on it:**
 
