@@ -13,6 +13,7 @@
 <header class="nav">
   <img src="/mark.svg" alt="" class="nav-logo" />
   <span class="nav-brand">Ya'll Cast</span>
+  <a href="/settings.html">Settings</a>
   <span id="who" class="text-muted"></span>
   <span id="role-tag" class="tag tag-neutral" hidden></span>
   <button type="button" class="btn btn-secondary" id="logout-btn">Log out</button>
@@ -48,7 +49,8 @@
 
   <!-- Connection info: every real endpoint/port involved, and what's
        actually running vs. not (nginx/RTMP doesn't exist in this build
-       yet — only this HTTP control API does). -->
+       yet — only this HTTP control API does). Read-only here — editing
+       destinations/buffer profile lives in Settings now. -->
   <div class="card">
     <p class="card-kicker">Connection info</p>
     <h2 class="card-title">Endpoints &amp; ports</h2>
@@ -58,162 +60,16 @@
     <p class="card-body text-muted" id="endpoints-note"></p>
   </div>
 
-  <!-- Destination profile -->
   <div class="card">
-    <p class="card-kicker" id="profile-kicker">Your profile</p>
-    <h2 class="card-title" id="profile-title">Where should your stream go?</h2>
-    <p class="card-body text-muted" id="profile-lede"></p>
-
-    <form id="profile-form">
-      <div class="destination-grid">
-        <div class="card">
-          <div class="row">
-            <h4>Mixcloud</h4>
-            <label class="radio"><input type="checkbox" name="mixcloud_enabled" /> <span>On</span></label>
-          </div>
-          <div class="field">
-            <label for="mixcloud_key">Stream key</label>
-            <input class="input" id="mixcloud_key" name="mixcloud_key" placeholder="Paste your Mixcloud key" />
-          </div>
-        </div>
-        <div class="card">
-          <div class="row">
-            <h4>YouTube</h4>
-            <label class="radio"><input type="checkbox" name="youtube_enabled" /> <span>On</span></label>
-          </div>
-          <div class="field">
-            <label for="youtube_key">Stream key</label>
-            <input class="input" id="youtube_key" name="youtube_key" placeholder="Paste your YouTube key" />
-          </div>
-        </div>
-        <div class="card">
-          <div class="row">
-            <h4>Twitch</h4>
-            <label class="radio"><input type="checkbox" name="twitch_enabled" /> <span>On</span></label>
-          </div>
-          <div class="field">
-            <label for="twitch_key">Stream key</label>
-            <input class="input" id="twitch_key" name="twitch_key" placeholder="Paste your Twitch key" />
-          </div>
-        </div>
-      </div>
-      <fieldset class="field" style="border:0;padding:0;margin:0">
-        <legend style="font-size:12px;margin-bottom:5px;color:color-mix(in srgb, var(--color-text) 70%, transparent)">Connection buffer</legend>
-        <div class="seg">
-          <label class="seg-opt"><input type="radio" name="bufferProfile" value="mobile" checked /> Mobile / unstable connection</label>
-          <label class="seg-opt"><input type="radio" name="bufferProfile" value="stable" /> Stable / wired connection</label>
-        </div>
-        <p class="card-body text-muted" style="font-size:13px">
-          Mobile gives destinations more tolerance for a jittery upload (~17s) before dropping one, at the cost of a little extra latency. Stable is tighter (~4s) for a wired connection where lower latency matters more.
-        </p>
-      </fieldset>
-      <p class="error-text" role="alert" hidden></p>
-      <p class="card-body" id="save-status"></p>
-      <button class="btn btn-primary" type="submit" id="save-btn" style="min-width:180px">Save</button>
-    </form>
-  </div>
-
-  <!-- Admin panel -->
-  <div class="card" id="admin-panel" hidden>
-    <p class="card-kicker">Admin</p>
-    <h2 class="card-title">Register a user</h2>
-    <form id="register-form">
-      <div class="field">
-        <label for="reg-email">Email</label>
-        <input class="input" id="reg-email" name="email" type="email" required />
-      </div>
-      <div class="field">
-        <label for="reg-password">Password · 12+ characters</label>
-        <input class="input" id="reg-password" name="password" type="password" minlength="12" required />
-      </div>
-      <fieldset class="field" style="border:0;padding:0;margin:0">
-        <legend style="font-size:12px;margin-bottom:5px;color:color-mix(in srgb, var(--color-text) 70%, transparent)">Role</legend>
-        <div class="seg">
-          <label class="seg-opt"><input type="radio" name="role" value="user" checked /> User</label>
-          <label class="seg-opt"><input type="radio" name="role" value="admin" /> Admin</label>
-        </div>
-      </fieldset>
-      <p class="error-text" role="alert" hidden></p>
-      <p class="card-body" id="register-status"></p>
-      <button class="btn btn-primary" type="submit">Create account</button>
-    </form>
-
-    <div class="hr"></div>
-
-    <h4>All users</h4>
-    <table class="table">
-      <thead>
-        <tr><th>Account</th><th>Role</th><th>Profile</th><th>Status</th><th></th></tr>
-      </thead>
-      <tbody id="users-table-body"></tbody>
-    </table>
+    <p class="card-body text-muted">
+      No destination set up yet, or want to change your stream keys, buffer profile,
+      account email/password, or (admin) manage other accounts? <a href="/settings.html">Settings</a>.
+    </p>
   </div>
 </main>
 
-<!-- Edit user dialog -->
-<div class="dialog-backdrop" id="edit-user-backdrop" hidden>
-  <div class="dialog">
-    <h3 class="dialog-title">Edit account</h3>
-    <form id="edit-user-form">
-      <div class="field">
-        <label for="edit-email">Email</label>
-        <input class="input" id="edit-email" name="email" type="email" required />
-      </div>
-      <fieldset class="field" style="border:0;padding:0;margin:0">
-        <legend style="font-size:12px;margin-bottom:5px;color:color-mix(in srgb, var(--color-text) 70%, transparent)">Role</legend>
-        <div class="seg">
-          <label class="seg-opt"><input type="radio" name="role" value="user" /> User</label>
-          <label class="seg-opt"><input type="radio" name="role" value="admin" /> Admin</label>
-        </div>
-      </fieldset>
-      <div class="field">
-        <label for="edit-password">New password <span class="text-muted">(leave blank to keep unchanged)</span></label>
-        <input class="input" id="edit-password" name="password" type="password" minlength="12" />
-      </div>
-      <p class="error-text" role="alert" hidden></p>
-      <div class="dialog-actions">
-        <button type="button" class="btn btn-secondary" id="edit-user-cancel">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save changes</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- Remove user confirmation dialog -->
-<div class="dialog-backdrop" id="remove-user-backdrop" hidden>
-  <div class="dialog">
-    <h3 class="dialog-title">Remove account</h3>
-    <p class="dialog-body">
-      Permanently delete <strong id="remove-user-email"></strong>? Their destination profile
-      (if any) is deleted with it. This can't be undone.
-    </p>
-    <p class="error-text" role="alert" hidden></p>
-    <div class="dialog-actions">
-      <button type="button" class="btn btn-secondary" id="remove-user-cancel">Cancel</button>
-      <button type="button" class="btn btn-primary" id="remove-user-confirm">Remove</button>
-    </div>
-  </div>
-</div>
-
 <!-- View templates — see /template.js. Row markup lives here, not as
      string concatenation in the script block below. -->
-<template id="user-row-template">
-  <tr>
-    <td><span data-field="email"></span> <span class="text-muted" data-when="isYou">(you)</span></td>
-    <td data-field="role"></td>
-    <td data-field="profileText"></td>
-    <td>
-      <span class="tag tag-accent" data-when="isActive">Active</span>
-      <span class="text-muted" data-unless="isActive">—</span>
-    </td>
-    <td class="action-buttons">
-      <button type="button" class="btn btn-secondary" data-when="showActivate" data-bind="data-activate-user:userId">Activate</button>
-      <button type="button" class="btn btn-secondary" data-bind="data-edit-user:userId data-edit-email:email data-edit-role:role">Edit</button>
-      <button type="button" class="btn btn-secondary" data-bind="data-remove-user:userId data-remove-email:email">Remove</button>
-    </td>
-  </tr>
-</template>
-
 <template id="endpoint-row-template">
   <tr>
     <th data-field="label"></th>
@@ -274,39 +130,9 @@
       : "Couldn't reach /health.";
   }
 
-  function setDestinationField(form, prefix, entry) {
-    form.elements[`${prefix}_enabled`].checked = !!entry?.enabled;
-    form.elements[`${prefix}_key`].value = entry?.streamKey ?? "";
-  }
-
-  function readDestination(form, prefix) {
-    const enabled = form.elements[`${prefix}_enabled`].checked;
-    const streamKey = form.elements[`${prefix}_key`].value;
-    return { enabled, ...(streamKey ? { streamKey } : {}) };
-  }
-
   async function loadProfile() {
     const res = await Yallcast.api("GET", "/profile");
-    const form = document.getElementById("profile-form");
-    if (res.status === 404) {
-      document.getElementById("profile-title").textContent = "Where should your stream go?";
-      document.getElementById("profile-lede").textContent =
-        "Set up at least one destination to get your OBS ingest URL.";
-      return null;
-    }
-    if (res.ok) {
-      document.getElementById("profile-title").textContent = "Edit destinations";
-      document.getElementById("profile-lede").textContent =
-        "Changes apply the next time you start streaming.";
-      setDestinationField(form, "mixcloud", res.data.mixcloud);
-      setDestinationField(form, "youtube", res.data.youtube);
-      setDestinationField(form, "twitch", res.data.twitch);
-      for (const radio of form.elements.bufferProfile) {
-        radio.checked = radio.value === (res.data.bufferProfile ?? "mobile");
-      }
-      return res.data;
-    }
-    return null;
+    return res.ok ? res.data : null;
   }
 
   async function refreshActiveStatus(profile) {
@@ -324,7 +150,7 @@
       activateBtn.hidden = false;
     } else {
       activeText.textContent = "No profile yet";
-      activeSub.textContent = "Set up a destination below first.";
+      activeSub.textContent = "Set up a destination in Settings first.";
       activateBtn.hidden = true;
     }
   }
@@ -337,10 +163,6 @@
     const roleTag = document.getElementById("role-tag");
     roleTag.textContent = session.role;
     roleTag.hidden = false;
-    if (session.role === "admin") {
-      document.getElementById("admin-panel").hidden = false;
-      await loadUsersTable();
-    }
 
     const profile = await loadProfile();
     await refreshActiveStatus(profile);
@@ -356,28 +178,6 @@
 
   document.getElementById("logout-btn").addEventListener("click", () => Yallcast.logout());
 
-  Yallcast.bindForm("#profile-form", async (_data) => {
-    const form = document.getElementById("profile-form");
-    const body = {
-      mixcloud: readDestination(form, "mixcloud"),
-      youtube: readDestination(form, "youtube"),
-      twitch: readDestination(form, "twitch"),
-      bufferProfile: form.elements.bufferProfile.value,
-    };
-    const res = await Yallcast.api("PUT", "/profile", body);
-    if (res.ok) {
-      document.getElementById("save-status").textContent =
-        `Saved at ${new Date().toLocaleTimeString()}`;
-      document.getElementById("ingest-box").hidden = false;
-      document.getElementById("ingest-url").textContent =
-        `rtmp://${location.hostname}:${RTMP_PORT}/ingest/${res.data.ingestStreamKey}`;
-      await refreshActiveStatus(res.data);
-      await renderEndpoints(res.data);
-      if (session.role === "admin") await loadUsersTable();
-    }
-    return res;
-  });
-
   document.getElementById("activate-btn").addEventListener("click", async () => {
     await Yallcast.api("POST", "/profile/activate");
     location.reload();
@@ -389,114 +189,6 @@
     const original = btn.textContent;
     btn.textContent = "Copied";
     setTimeout(() => (btn.textContent = original), 1600);
-  });
-
-  Yallcast.bindForm("#register-form", async (data) => {
-    const res = await Yallcast.api("POST", "/auth/register", data);
-    if (res.ok) {
-      document.getElementById("register-status").textContent =
-        `Created ${res.data.email} (${res.data.role}).`;
-      document.getElementById("register-form").reset();
-      await loadUsersTable();
-    }
-    return res;
-  });
-
-  async function loadUsersTable() {
-    const res = await Yallcast.api("GET", "/users");
-    if (!res.ok) return;
-    // The fetch here only fetches; the view (row markup, what "you"/
-    // "Active"/"Activate" mean visually) lives in #user-row-template —
-    // this just maps API fields onto the flags the template binds against.
-    const rows = res.data.users.map((u) => ({
-      userId: u.userId,
-      email: u.email,
-      role: u.role,
-      isYou: u.userId === session?.userId,
-      profileText: u.hasProfile ? "Set up" : "Not set up yet",
-      isActive: u.isActive,
-      showActivate: u.hasProfile && !u.isActive,
-    }));
-    Template.renderInto(document.getElementById("users-table-body"), "user-row-template", rows);
-  }
-
-  document.getElementById("users-table-body").addEventListener("click", async (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
-
-    if (target.dataset.activateUser) {
-      await Yallcast.api("POST", `/users/${encodeURIComponent(target.dataset.activateUser)}/activate`);
-      location.reload();
-      return;
-    }
-
-    if (target.dataset.editUser) {
-      openEditUserDialog(target.dataset.editUser, target.dataset.editEmail, target.dataset.editRole);
-      return;
-    }
-
-    if (target.dataset.removeUser) {
-      openRemoveUserDialog(target.dataset.removeUser, target.dataset.removeEmail);
-    }
-  });
-
-  // — Edit user dialog —
-  let editingUserId = null;
-
-  function openEditUserDialog(userId, email, role) {
-    editingUserId = userId;
-    const form = document.getElementById("edit-user-form");
-    form.reset();
-    form.elements.email.value = email;
-    for (const radio of form.elements.role) radio.checked = radio.value === role;
-    document.getElementById("edit-user-backdrop").hidden = false;
-  }
-
-  function closeEditUserDialog() {
-    document.getElementById("edit-user-backdrop").hidden = true;
-    editingUserId = null;
-  }
-
-  document.getElementById("edit-user-cancel").addEventListener("click", closeEditUserDialog);
-
-  Yallcast.bindForm("#edit-user-form", async (data) => {
-    const res = await Yallcast.api("PATCH", `/users/${encodeURIComponent(editingUserId)}`, data);
-    if (res.ok) {
-      closeEditUserDialog();
-      await loadUsersTable();
-    }
-    return res;
-  });
-
-  // — Remove user dialog —
-  let removingUserId = null;
-
-  function openRemoveUserDialog(userId, email) {
-    removingUserId = userId;
-    document.getElementById("remove-user-email").textContent = email;
-    const errorEl = document.querySelector("#remove-user-backdrop .error-text");
-    errorEl.hidden = true;
-    errorEl.textContent = "";
-    document.getElementById("remove-user-backdrop").hidden = false;
-  }
-
-  function closeRemoveUserDialog() {
-    document.getElementById("remove-user-backdrop").hidden = true;
-    removingUserId = null;
-  }
-
-  document.getElementById("remove-user-cancel").addEventListener("click", closeRemoveUserDialog);
-
-  document.getElementById("remove-user-confirm").addEventListener("click", async () => {
-    const res = await Yallcast.api("DELETE", `/users/${encodeURIComponent(removingUserId)}`);
-    if (res.ok) {
-      closeRemoveUserDialog();
-      await loadUsersTable();
-    } else {
-      const errorEl = document.querySelector("#remove-user-backdrop .error-text");
-      errorEl.textContent = res.data?.error?.message ?? "Something went wrong.";
-      errorEl.hidden = false;
-    }
   });
 
   init();

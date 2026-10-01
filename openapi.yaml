@@ -236,12 +236,16 @@ paths:
     patch:
       operationId: updateUser
       tags: [profile]
-      summary: Admin-only — change another account's email, role, and/or password.
+      summary: Change an account's email/password — your own, or (admin-only) another account's role too.
       description: |
-        At least one of email/role/password required. Demoting the last remaining
-        admin to role "user" is rejected with 409 — see docs/TECHNICAL.md, Security
-        invariants. Password, if provided, is hashed the same way as at registration
-        (Bun.password); the plaintext is never persisted or logged.
+        At least one of email/role/password required. Self-service: any authenticated
+        user can edit their own email/password this way (this is the "My account"
+        settings path). Editing a *different* account, or including `role` at all
+        (even on your own account), requires an admin JWT — 403 otherwise. Demoting
+        the last remaining admin to role "user" is rejected with 409 — see
+        docs/TECHNICAL.md, Security invariants. Password, if provided, is hashed the
+        same way as at registration (Bun.password); the plaintext is never persisted
+        or logged.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -269,7 +273,7 @@ paths:
         '401':
           $ref: '#/components/responses/AuthError'
         '403':
-          description: Valid session, but not an admin.
+          description: Valid session, but editing a different account or including `role` without being an admin.
           content:
             application/json:
               schema:

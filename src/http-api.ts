@@ -42,11 +42,13 @@ import appJs from "./static/app.js" with { type: "text" };
 // time per the `type: "text"` attribute — see text-assets.d.ts.
 import dashboardHtmlRaw from "./static/dashboard.html" with { type: "text" };
 import loginHtmlRaw from "./static/login.html" with { type: "text" };
+import settingsHtmlRaw from "./static/settings.html" with { type: "text" };
 import setupHtmlRaw from "./static/setup.html" with { type: "text" };
 import templateJs from "./static/template.js" with { type: "text" };
 
 const dashboardHtml = dashboardHtmlRaw as unknown as string;
 const loginHtml = loginHtmlRaw as unknown as string;
+const settingsHtml = settingsHtmlRaw as unknown as string;
 const setupHtml = setupHtmlRaw as unknown as string;
 
 export interface ModuleRouter {
@@ -70,6 +72,7 @@ const STATIC_FILES: Array<{ route: string; body: string; contentType: string }> 
   { route: "/setup.html", body: setupHtml, contentType: "text/html" },
   { route: "/login.html", body: loginHtml, contentType: "text/html" },
   { route: "/dashboard.html", body: dashboardHtml, contentType: "text/html" },
+  { route: "/settings.html", body: settingsHtml, contentType: "text/html" },
   { route: "/app.js", body: appJs, contentType: "application/javascript" },
   { route: "/template.js", body: templateJs, contentType: "application/javascript" },
   { route: "/app.css", body: appCss, contentType: "text/css" },

@@ -5,14 +5,27 @@
 // email uniqueness on update the same as registration does.
 
 import { describe, expect, test } from "bun:test";
-import { ConflictError, NotFoundError, ValidationError } from "../../src/infra/errors.ts";
+import {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from "../../src/infra/errors.ts";
 import { EventBus } from "../../src/infra/event-bus.ts";
 import type { UserRemoved, UserUpdated } from "../../src/infra/events.ts";
 import { Logger } from "../../src/infra/logger.ts";
+import type { JwtPayload } from "../../src/modules/auth/auth.service.ts";
 import type { DestinationProfileRepository } from "../../src/modules/profiles/profiles.repository.ts";
 import type { RelayStateRepository } from "../../src/modules/relay/relay.repository.ts";
 import type { UserDoc, UserRepository } from "../../src/modules/users/users.repository.ts";
 import { UsersService } from "../../src/modules/users/users.service.ts";
+
+function admin(userId: string): JwtPayload {
+  return { userId, role: "admin" };
+}
+function asUser(userId: string): JwtPayload {
+  return { userId, role: "user" };
+}
 
 function makeUserDoc(overrides: Partial<UserDoc>): UserDoc {
   return {
@@ -75,9 +88,9 @@ describe("UsersService.updateUser", () => {
       new EventBus(new Logger()),
     );
 
-    await expect(service.updateUser("admin-1", { role: "user" }, "admin-1")).rejects.toBeInstanceOf(
-      ConflictError,
-    );
+    await expect(
+      service.updateUser("admin-1", { role: "user" }, admin("admin-1")),
+    ).rejects.toBeInstanceOf(ConflictError);
   });
 
   test("allows demoting an admin when another admin still exists", async () => {
@@ -94,7 +107,7 @@ describe("UsersService.updateUser", () => {
       new EventBus(new Logger()),
     );
 
-    const result = await service.updateUser("admin-1", { role: "user" }, "admin-2");
+    const result = await service.updateUser("admin-1", { role: "user" }, admin("admin-2"));
     expect(result.role).toBe("user");
   });
 
@@ -113,7 +126,7 @@ describe("UsersService.updateUser", () => {
     );
 
     await expect(
-      service.updateUser("u2", { email: "taken@example.com" }, "admin-1"),
+      service.updateUser("u2", { email: "taken@example.com" }, admin("admin-1")),
     ).rejects.toBeInstanceOf(ConflictError);
   });
 
@@ -126,7 +139,9 @@ describe("UsersService.updateUser", () => {
       new EventBus(new Logger()),
     );
 
-    await expect(service.updateUser("u1", {}, "admin-1")).rejects.toBeInstanceOf(ValidationError);
+    await expect(service.updateUser("u1", {}, admin("admin-1"))).rejects.toBeInstanceOf(
+      ValidationError,
+    );
   });
 
   test("emits UserUpdated with the changed field names, not the values", async () => {
@@ -142,7 +157,7 @@ describe("UsersService.updateUser", () => {
       eventBus,
     );
 
-    await service.updateUser("u1", { email: "new@example.com" }, "admin-1");
+    await service.updateUser("u1", { email: "new@example.com" }, admin("admin-1"));
 
     expect(received).toHaveLength(1);
     expect(received[0]).toMatchObject({
@@ -161,8 +176,58 @@ describe("UsersService.updateUser", () => {
       new EventBus(new Logger()),
     );
 
-    await expect(service.updateUser("ghost", { role: "admin" }, "admin-1")).rejects.toBeInstanceOf(
-      NotFoundError,
+    await expect(
+      service.updateUser("ghost", { role: "admin" }, admin("admin-1")),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  test("a user can edit their own email/password (self-service)", async () => {
+    const state: FakeUsersState = { byId: new Map([["u1", makeUserDoc({ userId: "u1" })]]) };
+    const service = new UsersService(
+      fakeUserRepository(state),
+      fakeProfileRepository([]),
+      fakeRelayRepository(null),
+      new EventBus(new Logger()),
+    );
+
+    const result = await service.updateUser(
+      "u1",
+      { email: "new@example.com", password: "a-new-long-password" },
+      asUser("u1"),
+    );
+    expect(result.email).toBe("new@example.com");
+  });
+
+  test("a user cannot edit another account", async () => {
+    const state: FakeUsersState = {
+      byId: new Map([
+        ["u1", makeUserDoc({ userId: "u1" })],
+        ["u2", makeUserDoc({ userId: "u2", email: "other@example.com" })],
+      ]),
+    };
+    const service = new UsersService(
+      fakeUserRepository(state),
+      fakeProfileRepository([]),
+      fakeRelayRepository(null),
+      new EventBus(new Logger()),
+    );
+
+    await expect(
+      service.updateUser("u2", { email: "hijacked@example.com" }, asUser("u1")),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  test("a user cannot change their own role, even to the same value", async () => {
+    const state: FakeUsersState = { byId: new Map([["u1", makeUserDoc({ userId: "u1" })]]) };
+    const service = new UsersService(
+      fakeUserRepository(state),
+      fakeProfileRepository([]),
+      fakeRelayRepository(null),
+      new EventBus(new Logger()),
+    );
+
+    await expect(service.updateUser("u1", { role: "admin" }, asUser("u1"))).rejects.toBeInstanceOf(
+      ForbiddenError,
     );
   });
 });

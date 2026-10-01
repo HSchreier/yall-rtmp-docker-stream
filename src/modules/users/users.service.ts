@@ -7,11 +7,24 @@
 // repositories. The router's job is only to translate HTTP <-> these
 // methods; it makes no decisions of its own about what "active" or
 // "hasProfile" mean, or when a mutation is actually safe to allow.
+//
+// updateUser() is also the self-service "my account" path (see Settings
+// §My account) — a user-role caller editing their own userId is allowed
+// through, same ownership pattern as /profile, but can never include
+// `role` in that patch, even on themselves: letting a non-admin touch
+// `role` at all, even their own, is a privilege-escalation path, not a
+// convenience.
 
-import { ConflictError, NotFoundError, ValidationError } from "../../infra/errors.ts";
+import {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from "../../infra/errors.ts";
 import type { EventBus } from "../../infra/event-bus.ts";
 import type { Role } from "../../infra/events.ts";
 import { EMAIL_RE, MIN_PASSWORD_LENGTH } from "../../infra/validators.ts";
+import type { JwtPayload } from "../auth/auth.service.ts";
 import type { DestinationProfileRepository } from "../profiles/profiles.repository.ts";
 import type { RelayStateRepository } from "../relay/relay.repository.ts";
 import type { UserRepository } from "./users.repository.ts";
@@ -69,8 +82,16 @@ export class UsersService {
   async updateUser(
     targetUserId: string,
     patch: UserPatch,
-    updatedBy: string,
+    actingUser: JwtPayload,
   ): Promise<UserListEntry> {
+    const isSelf = actingUser.userId === targetUserId;
+    if (!isSelf && actingUser.role !== "admin") {
+      throw new ForbiddenError("Admin role required to edit another account.");
+    }
+    if (patch.role !== undefined && actingUser.role !== "admin") {
+      throw new ForbiddenError("Admin role required to change a role — including your own.");
+    }
+
     const target = await this.users.findById(targetUserId);
     if (!target) throw new NotFoundError("No such user.");
 
@@ -123,7 +144,7 @@ export class UsersService {
     this.eventBus.emit("UserUpdated", {
       userId: targetUserId,
       changedFields,
-      updatedBy,
+      updatedBy: actingUser.userId,
       at: new Date(),
     });
 

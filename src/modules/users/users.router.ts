@@ -1,7 +1,11 @@
 // UsersRouter — translates HTTP <-> UsersService only. Owns /users,
-// /users/:userId/activate, /users/:userId (PATCH/DELETE) — all admin-only.
-// No orchestration happens here — UsersService owns every decision about
-// what's safe to change or remove.
+// /users/:userId/activate, /users/:userId (PATCH/DELETE). GET/activate/
+// DELETE stay admin-only here (simple, unconditional — no reason to push
+// that into the service). PATCH is NOT admin-only — it's also the
+// self-service "my account" path, so the admin-vs-self distinction
+// depends on who's being edited and what's being changed, which is real
+// business logic. That nuance lives in UsersService.updateUser(), not
+// scattered here — same reasoning as the /profile ownership check.
 
 import { jsonResponse, readJson } from "../../infra/http.ts";
 import { requireAuth } from "../../infra/http-session.ts";
@@ -38,9 +42,8 @@ export class UsersRouter {
     const targetUserId = pathname.match(USER_RE)?.[1];
     if (targetUserId && req.method === "PATCH") {
       const session = requireAuth(req, this.auth);
-      this.auth.requireAdmin(session);
       const body = await readJson<UserPatch>(req);
-      const updated = await this.usersService.updateUser(targetUserId, body, session.userId);
+      const updated = await this.usersService.updateUser(targetUserId, body, session);
       return jsonResponse(200, updated);
     }
 
