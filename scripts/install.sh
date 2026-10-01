@@ -58,23 +58,26 @@ success "Docker $(docker --version | awk '{print $3}' | tr -d ',')"
 
 # ── .env ─────────────────────────────────────────────────────────────────────
 if [[ -f .env ]]; then
-  warn ".env already exists — leaving it as-is. Delete it first if you want a fresh JWT_SECRET."
+  warn ".env already exists — leaving it as-is. Delete it first if you want fresh secrets."
 else
   cp .env.example .env
-  # A real random secret, not the empty placeholder from .env.example —
+  # Real random secrets, not the empty placeholders from .env.example —
   # openssl is present on every platform this script targets (macOS ships
   # it, every mainstream Linux distro's base image has it or gets it via
   # the package manager Docker itself already required above).
   JWT_SECRET="$(openssl rand -hex 32)"
+  ENCRYPTION_KEY="$(openssl rand -hex 32)"
   # Portable in-place sed: BSD sed (macOS) requires an explicit (empty)
   # backup-suffix argument after -i, GNU sed (Linux) doesn't accept one at
   # all in that position — the two are not drop-in compatible.
   if [[ "$(uname)" == "Darwin" ]]; then
     sed -i '' "s#^JWT_SECRET=.*#JWT_SECRET=${JWT_SECRET}#" .env
+    sed -i '' "s#^ENCRYPTION_KEY=.*#ENCRYPTION_KEY=${ENCRYPTION_KEY}#" .env
   else
     sed -i "s#^JWT_SECRET=.*#JWT_SECRET=${JWT_SECRET}#" .env
+    sed -i "s#^ENCRYPTION_KEY=.*#ENCRYPTION_KEY=${ENCRYPTION_KEY}#" .env
   fi
-  success ".env created with a generated JWT_SECRET"
+  success ".env created with a generated JWT_SECRET and ENCRYPTION_KEY"
 fi
 
 # ── Dependencies ─────────────────────────────────────────────────────────────

@@ -15,7 +15,7 @@
 
 import type { Collection, Db } from "mongodb";
 import { ObjectId } from "mongodb";
-import type { Role } from "./events.ts";
+import type { Role } from "../../infra/events.ts";
 
 export interface UserDoc {
   userId: string;
@@ -93,5 +93,28 @@ export class UserRepository {
     };
     const result = await this.#collection.insertOne(row);
     return toDoc({ ...row, _id: result.insertedId });
+  }
+
+  async countByRole(role: Role): Promise<number> {
+    return this.#collection.countDocuments({ role });
+  }
+
+  async update(
+    userId: string,
+    patch: { email?: string; role?: Role; passwordHash?: string },
+  ): Promise<UserDoc | null> {
+    if (!ObjectId.isValid(userId)) return null;
+    const result = await this.#collection.findOneAndUpdate(
+      { _id: new ObjectId(userId) } as never,
+      { $set: patch },
+      { returnDocument: "after" },
+    );
+    return result ? toDoc(result as UserRow) : null;
+  }
+
+  async delete(userId: string): Promise<boolean> {
+    if (!ObjectId.isValid(userId)) return false;
+    const result = await this.#collection.deleteOne({ _id: new ObjectId(userId) } as never);
+    return result.deletedCount > 0;
   }
 }

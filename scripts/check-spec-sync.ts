@@ -19,7 +19,13 @@ const technicalPath = `${repoRoot}docs/TECHNICAL.md`;
 // but the static HTML pages aren't APIs (no request/response contract to
 // spec), and the internal nginx-notify routes are described in prose in
 // TECHNICAL.md's module list, not in the HTTP payload table.
-const staticPagesNotInSpec = new Set(["/", "/setup.html", "/login.html", "/dashboard.html"]);
+const staticPagesNotInSpec = new Set([
+  "/",
+  "/setup.html",
+  "/login.html",
+  "/dashboard.html",
+  "/settings.html",
+]);
 const internalRoutesNotInTable = new Set([
   "/internal/nginx/on-publish",
   "/internal/nginx/on-publish-done",
