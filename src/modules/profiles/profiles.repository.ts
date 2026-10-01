@@ -32,17 +32,28 @@ export interface DestinationEntry {
   customIngestUrl?: string;
 }
 
+// Ingest-side jitter tolerance, consumed by NginxConfigRenderer alongside
+// this profile's destination keys — see docs/TECHNICAL.md, RTMP relay
+// §Per-user buffer profile for the out_queue/out_cork/relay_buffer values
+// each preset maps to and why "mobile" (not nginx-rtmp's own tighter
+// defaults) is the default.
+export type BufferProfile = "mobile" | "stable";
+const DEFAULT_BUFFER_PROFILE: BufferProfile = "mobile";
+
 export interface DestinationProfileDoc {
   userId: string;
   ingestStreamKey: string;
   mixcloud: DestinationEntry;
   youtube: DestinationEntry;
   twitch: DestinationEntry;
+  bufferProfile: BufferProfile;
   updatedAt: Date;
   updatedBy: string;
 }
 
-export type DestinationProfileUpdate = Partial<Record<Destination, Partial<DestinationEntry>>>;
+export type DestinationProfileUpdate = Partial<Record<Destination, Partial<DestinationEntry>>> & {
+  bufferProfile?: BufferProfile;
+};
 
 const EMPTY_ENTRY: DestinationEntry = { enabled: false };
 const DESTINATIONS = ["mixcloud", "youtube", "twitch"] as const;
@@ -129,15 +140,21 @@ export class DestinationProfileRepository {
       mixcloud: { ...(existing?.mixcloud ?? EMPTY_ENTRY), ...update.mixcloud },
       youtube: { ...(existing?.youtube ?? EMPTY_ENTRY), ...update.youtube },
       twitch: { ...(existing?.twitch ?? EMPTY_ENTRY), ...update.twitch },
+      bufferProfile: update.bufferProfile ?? existing?.bufferProfile ?? DEFAULT_BUFFER_PROFILE,
       updatedAt: new Date(),
       updatedBy,
     };
 
     await this.#collection.replaceOne({ userId }, this.#encryptDoc(next), { upsert: true });
 
+    // Iterate the known destination keys, not Object.keys(update) — update
+    // can also carry `bufferProfile`, which isn't a Destination and has no
+    // event of its own to emit.
     const at = next.updatedAt;
-    for (const destination of Object.keys(update) as Destination[]) {
-      this.eventBus.emit("DestinationCredentialsUpdated", { userId, destination, at });
+    for (const destination of DESTINATIONS) {
+      if (update[destination]) {
+        this.eventBus.emit("DestinationCredentialsUpdated", { userId, destination, at });
+      }
     }
 
     return next;

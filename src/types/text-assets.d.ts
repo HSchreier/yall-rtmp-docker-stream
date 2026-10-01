@@ -23,3 +23,16 @@ declare module "*.js" {
   const contents: string;
   export default contents;
 }
+declare module "*.svg" {
+  const contents: string;
+  export default contents;
+}
+
+// Bun's file-loader import attribute (`with { type: "file" }`), for binary
+// assets (favicons) that can't go through the text loader above — resolves
+// to a path string at both dev and compile time; read the actual bytes
+// back with Bun.file(thatPath). Not declared by bun-types, no conflict.
+declare module "*.png" {
+  const path: string;
+  export default path;
+}

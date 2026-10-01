@@ -24,6 +24,9 @@
 // these files too, since they're real imports in the module graph —
 // no more needing a manual restart after touching src/static/*.
 
+import markSvg from "../assets/brand/mark.svg" with { type: "text" };
+import mark32Path from "../assets/brand/mark-32.png" with { type: "file" };
+import mark180Path from "../assets/brand/mark-180.png" with { type: "file" };
 import modernistCss from "../assets/design-system/modernist/styles.css" with { type: "text" };
 import { AppError } from "./infra/errors.ts";
 import { jsonResponse, redirect } from "./infra/http.ts";
@@ -59,7 +62,7 @@ interface HttpApiDeps {
 }
 
 interface StaticAsset {
-  body: string;
+  body: string | ArrayBuffer;
   contentType: string;
 }
 
@@ -71,6 +74,18 @@ const STATIC_FILES: Array<{ route: string; body: string; contentType: string }> 
   { route: "/template.js", body: templateJs, contentType: "application/javascript" },
   { route: "/app.css", body: appCss, contentType: "text/css" },
   { route: "/modernist.css", body: modernistCss, contentType: "text/css" },
+  { route: "/mark.svg", body: markSvg, contentType: "image/svg+xml" },
+];
+
+// Binary assets can't use the text loader — `with { type: "file" }` embeds
+// the raw bytes in the compiled binary and gives back a path string;
+// Bun.file() reads the actual bytes back from it at runtime. Verified with
+// a minimal reproduction (embed a real PNG, run the compiled binary from a
+// directory with no source file present, confirm the byte count matches)
+// before wiring this in, same as the text-asset fix above.
+const BINARY_STATIC_FILES: Array<{ route: string; path: string; contentType: string }> = [
+  { route: "/mark-32.png", path: mark32Path, contentType: "image/png" },
+  { route: "/mark-180.png", path: mark180Path, contentType: "image/png" },
 ];
 
 export class HttpApi {
@@ -81,6 +96,10 @@ export class HttpApi {
 
   async init(): Promise<void> {
     for (const { route, body, contentType } of STATIC_FILES) {
+      this.#assets.set(route, { body, contentType });
+    }
+    for (const { route, path, contentType } of BINARY_STATIC_FILES) {
+      const body = await Bun.file(path).arrayBuffer();
       this.#assets.set(route, { body, contentType });
     }
 

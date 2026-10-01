@@ -4,11 +4,14 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Dashboard — Ya'll Cast</title>
+<link rel="icon" type="image/png" href="/mark-32.png" />
+<link rel="apple-touch-icon" href="/mark-180.png" />
 <link rel="stylesheet" href="/modernist.css" />
 <link rel="stylesheet" href="/app.css" />
 </head>
 <body>
 <header class="nav">
+  <img src="/mark.svg" alt="" class="nav-logo" />
   <span class="nav-brand">Ya'll Cast</span>
   <span id="who" class="text-muted"></span>
   <span id="role-tag" class="tag tag-neutral" hidden></span>
@@ -94,6 +97,16 @@
           </div>
         </div>
       </div>
+      <fieldset class="field" style="border:0;padding:0;margin:0">
+        <legend style="font-size:12px;margin-bottom:5px;color:color-mix(in srgb, var(--color-text) 70%, transparent)">Connection buffer</legend>
+        <div class="seg">
+          <label class="seg-opt"><input type="radio" name="bufferProfile" value="mobile" checked /> Mobile / unstable connection</label>
+          <label class="seg-opt"><input type="radio" name="bufferProfile" value="stable" /> Stable / wired connection</label>
+        </div>
+        <p class="card-body text-muted" style="font-size:13px">
+          Mobile gives destinations more tolerance for a jittery upload (~17s) before dropping one, at the cost of a little extra latency. Stable is tighter (~4s) for a wired connection where lower latency matters more.
+        </p>
+      </fieldset>
       <p class="error-text" role="alert" hidden></p>
       <p class="card-body" id="save-status"></p>
       <button class="btn btn-primary" type="submit" id="save-btn" style="min-width:180px">Save</button>
@@ -288,6 +301,9 @@
       setDestinationField(form, "mixcloud", res.data.mixcloud);
       setDestinationField(form, "youtube", res.data.youtube);
       setDestinationField(form, "twitch", res.data.twitch);
+      for (const radio of form.elements.bufferProfile) {
+        radio.checked = radio.value === (res.data.bufferProfile ?? "mobile");
+      }
       return res.data;
     }
     return null;
@@ -346,6 +362,7 @@
       mixcloud: readDestination(form, "mixcloud"),
       youtube: readDestination(form, "youtube"),
       twitch: readDestination(form, "twitch"),
+      bufferProfile: form.elements.bufferProfile.value,
     };
     const res = await Yallcast.api("PUT", "/profile", body);
     if (res.ok) {

@@ -95,6 +95,12 @@
   flex-wrap: wrap;
 }
 
+.nav-logo {
+  height: 28px;
+  width: 28px;
+  border-radius: 6px;
+}
+
 [hidden] {
   display: none;
 }

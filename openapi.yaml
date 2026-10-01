@@ -596,7 +596,7 @@ components:
 
     Profile:
       type: object
-      required: [ingestStreamKey, mixcloud, youtube, twitch, updatedAt, updatedBy]
+      required: [ingestStreamKey, mixcloud, youtube, twitch, bufferProfile, updatedAt, updatedBy]
       properties:
         ingestStreamKey:
           type: string
@@ -604,6 +604,10 @@ components:
         mixcloud: { $ref: '#/components/schemas/DestinationEntry' }
         youtube: { $ref: '#/components/schemas/DestinationEntry' }
         twitch: { $ref: '#/components/schemas/DestinationEntry' }
+        bufferProfile:
+          type: string
+          enum: [mobile, stable]
+          description: Ingest-side jitter tolerance preset, consumed by NginxConfigRenderer. Defaults to "mobile" on first write — see docs/TECHNICAL.md, RTMP relay §Per-user buffer profile.
         updatedAt: { type: string, format: date-time }
         updatedBy:
           type: string
@@ -615,6 +619,7 @@ components:
         mixcloud: { $ref: '#/components/schemas/DestinationEntry' }
         youtube: { $ref: '#/components/schemas/DestinationEntry' }
         twitch: { $ref: '#/components/schemas/DestinationEntry' }
+        bufferProfile: { type: string, enum: [mobile, stable] }
 
     ActivateResponse:
       type: object

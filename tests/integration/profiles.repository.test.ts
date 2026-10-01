@@ -102,4 +102,41 @@ describe("DestinationProfileRepository (integration — requires live Mongo)", (
     // The repository's own get() still returns it decrypted.
     expect((await repo.get("user-5"))?.mixcloud.streamKey).toBe(plaintext);
   });
+
+  test("bufferProfile defaults to 'mobile' on first write, is preserved on a later partial update", async () => {
+    const first = await repo.upsert(
+      "user-6",
+      { mixcloud: { enabled: true, streamKey: "k" } },
+      "user-6",
+    );
+    expect(first.bufferProfile).toBe("mobile");
+
+    const second = await repo.upsert(
+      "user-6",
+      { youtube: { enabled: true, streamKey: "k2" } },
+      "user-6",
+    );
+    expect(second.bufferProfile).toBe("mobile");
+  });
+
+  test("bufferProfile can be set explicitly and is honored on the next upsert with no change", async () => {
+    const first = await repo.upsert("user-7", { bufferProfile: "stable" }, "user-7");
+    expect(first.bufferProfile).toBe("stable");
+
+    const second = await repo.upsert(
+      "user-7",
+      { mixcloud: { enabled: true, streamKey: "k" } },
+      "user-7",
+    );
+    expect(second.bufferProfile).toBe("stable");
+  });
+
+  test("setting bufferProfile alone doesn't emit a DestinationCredentialsUpdated event", async () => {
+    const received: DestinationCredentialsUpdated[] = [];
+    eventBus.on("DestinationCredentialsUpdated", (payload) => received.push(payload));
+
+    await repo.upsert("user-8", { bufferProfile: "stable" }, "user-8");
+
+    expect(received).toHaveLength(0);
+  });
 });
