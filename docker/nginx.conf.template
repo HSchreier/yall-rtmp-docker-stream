@@ -19,7 +19,21 @@
 # profile is ever active at a time — see §RTMP relay.
 
 worker_processes auto;
-error_log /dev/stderr warn;
+# A real file, not /dev/stderr — found the hard way (build order step 4's
+# own end-to-end container test, not a guess): NginxProcessManager spawns
+# nginx with its stderr as a Node pipe (`stdio: ["ignore", "pipe",
+# "pipe"]`), not an inherited fd, and nginx opening `/dev/stderr` then
+# resolves through `/proc/self/fd/2` to that pipe — which fails at open()
+# with ENXIO ("No such device or address"), a known Linux quirk for
+# reopening a pipe by its /proc/self/fd path. `docker build`'s own
+# `nginx -t` self-test never caught this: BuildKit's RUN steps give `-t`
+# a real inherited stderr, not a pipe, so the failure mode only shows up
+# once NginxProcessManager actually spawns the process at runtime. Early
+# fatal startup errors (like this one was) still reach the sidecar's logs
+# regardless of this path — nginx writes those to its own process stderr
+# before it's even parsed `error_log`, which Node's piped `child.stderr`
+# always captures.
+error_log /usr/local/nginx/logs/error.log warn;
 pid /tmp/nginx.pid;
 
 events {

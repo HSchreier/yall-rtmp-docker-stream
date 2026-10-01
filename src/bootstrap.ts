@@ -5,12 +5,15 @@
 //
 // Current slice: Logger, the process-level safety net, EventBus,
 // ConfigService, MongoService, the three repositories, their owning
-// services, AuthService, IngestEventReceiver + RelayRouter, the module
-// routers, and a first-cut HttpApi. Still missing vs.
-// docs/TECHNICAL.md's module list: StreamState, NginxConfigRenderer is
-// built but unwired (no caller yet), NginxProcessManager, HealthService,
+// services, AuthService, NginxProcessManager (which is what actually
+// calls NginxConfigRenderer now), IngestEventReceiver + RelayRouter, the
+// module routers, and a first-cut HttpApi. Still missing vs.
+// docs/TECHNICAL.md's module list: StreamState, HealthService,
 // StreamOrchestrator and its submodules, AuditLogger — added
-// incrementally, bottom-up by dependency.
+// incrementally, bottom-up by dependency. Graceful SIGTERM shutdown
+// (stopping nginx/Mongo/HttpApi cleanly on container stop) is also still
+// unwired here — a pre-existing gap across every module, not something
+// introduced by this step; flagged, not silently left implicit.
 
 import { HttpApi, type ModuleRouter } from "./http-api.ts";
 import { ConfigService } from "./infra/config-service.ts";
@@ -24,6 +27,7 @@ import { DestinationProfileRepository } from "./modules/profiles/profiles.reposi
 import { ProfilesRouter } from "./modules/profiles/profiles.router.ts";
 import { ProfileService } from "./modules/profiles/profiles.service.ts";
 import { IngestEventReceiver } from "./modules/relay/ingest-event-receiver.ts";
+import { NginxProcessManager } from "./modules/relay/nginx-process-manager.ts";
 import { RelayStateRepository } from "./modules/relay/relay.repository.ts";
 import { RelayRouter } from "./modules/relay/relay.router.ts";
 import { UserRepository } from "./modules/users/users.repository.ts";
@@ -39,6 +43,7 @@ export interface App {
   readonly destinationProfiles: DestinationProfileRepository;
   readonly relayState: RelayStateRepository;
   readonly auth: AuthService;
+  readonly nginxProcessManager: NginxProcessManager;
   readonly httpApi: HttpApi;
 }
 
@@ -88,7 +93,22 @@ export async function bootstrap(): Promise<App> {
   // per-call behavior.
   const auth = new AuthService(users, eventBus, config.get().jwtSecret);
 
-  // Step 4: the service objects that orchestrate across more than one
+  // Step 4: NginxProcessManager — subscribes to ActiveProfileChanged and
+  // DestinationCredentialsUpdated, and if a profile is already active
+  // (a restart, not a fresh install), renders + starts nginx immediately.
+  // Ahead of the service objects below since nothing there depends on it
+  // and docs/TECHNICAL.md's own numbered init order puts it here, right
+  // after MongoService-dependent state exists.
+  const nginxProcessManager = new NginxProcessManager({
+    logger,
+    eventBus,
+    destinationProfiles,
+    relayState,
+    httpPort: config.get().httpPort,
+  });
+  await nginxProcessManager.init();
+
+  // Step 5: the service objects that orchestrate across more than one
   // repository — UsersService (list-with-status, admin activation) and
   // ProfileService (own-profile activation). Routers below talk only to
   // these, never to a repository directly.
@@ -96,7 +116,7 @@ export async function bootstrap(): Promise<App> {
   const profileService = new ProfileService(destinationProfiles, relayState);
   const ingestEventReceiver = new IngestEventReceiver(destinationProfiles, relayState, eventBus);
 
-  // Step 5: module routers — each owns its own routes and its own service.
+  // Step 6: module routers — each owns its own routes and its own service.
   const routers: ModuleRouter[] = [
     new AuthRouter(auth, users),
     new UsersRouter(usersService, auth),
@@ -105,7 +125,7 @@ export async function bootstrap(): Promise<App> {
     new RelayRouter(ingestEventReceiver),
   ];
 
-  // Step 6: HttpApi last — binds the listener only once everything it
+  // Step 7: HttpApi last — binds the listener only once everything it
   // might touch on an incoming request is already up.
   const httpApi = new HttpApi({
     auth,
@@ -125,6 +145,7 @@ export async function bootstrap(): Promise<App> {
     destinationProfiles,
     relayState,
     auth,
+    nginxProcessManager,
     httpApi,
   };
 }

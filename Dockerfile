@@ -84,6 +84,12 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY scripts ./scripts
 COPY assets ./assets
+# NginxConfigRenderer imports docker/nginx.conf.template as a build-time
+# text asset (`with { type: "text" }`) — needed here too, not just in the
+# nginx-build stage's own copy below: that one only feeds the build-time
+# `nginx -t` self-test, this one is what actually gets embedded into the
+# compiled sidecar binary NginxProcessManager runs at startup.
+COPY docker ./docker
 
 # Typecheck is a build gate, not a separate CI-only step — a broken build
 # never produces an image to even smoke-test.
