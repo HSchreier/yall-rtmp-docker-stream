@@ -398,7 +398,7 @@
     <span class="nav-brand">Ya'll Cast</span>
     <div class="header-right">
       <span id="user-email" class="text-muted"></span>
-      <button class="secondary" id="logout-btn">Log out</button>
+      <button type="button" class="secondary" id="logout-btn">Log out</button>
     </div>
   </header>
 
@@ -410,7 +410,7 @@
         <div class="streaming-status" id="status-indicator">🟢</div>
         <div class="status-label" id="status-label">Ready to Stream</div>
         <div class="timer" id="stream-timer" style="display: none;">00:00:00</div>
-        <button class="stop-btn" id="stop-btn" style="display: none;">Stop streaming</button>
+        <button type="button" class="stop-btn" id="stop-btn" style="display: none;">Stop streaming</button>
       </div>
 
       <!-- RTMP Endpoint -->
@@ -418,8 +418,8 @@
         <h2 class="panel-title">RTMP Endpoint</h2>
         <div class="endpoint-box">
           <span class="endpoint-text" id="rtmp-endpoint">rtmp://relay.example.com/live/...</span>
-          <button id="copy-endpoint-btn">Copy</button>
-          <button id="show-endpoint-btn">Show</button>
+          <button type="button" id="copy-endpoint-btn">Copy</button>
+          <button type="button" id="show-endpoint-btn">Show</button>
         </div>
         <p style="font-size: 12px; color: var(--color-text-muted); margin-top: 12px;">Push your RTMP stream to this endpoint.</p>
       </div>
@@ -433,17 +433,17 @@
           <div class="destination-item">
             <span class="dest-name">Mixcloud</span>
             <span class="dest-status"><span class="status-dot"></span> Off</span>
-            <button>Configure</button>
+            <button type="button">Configure</button>
           </div>
           <div class="destination-item">
             <span class="dest-name">YouTube</span>
             <span class="dest-status"><span class="status-dot"></span> Off</span>
-            <button>Configure</button>
+            <button type="button">Configure</button>
           </div>
           <div class="destination-item">
             <span class="dest-name">Twitch</span>
             <span class="dest-status"><span class="status-dot"></span> Off</span>
-            <button>Configure</button>
+            <button type="button">Configure</button>
           </div>
         </div>
       </div>
@@ -454,12 +454,12 @@
         <div class="streamkey-display">
           <span class="streamkey-text" id="streamkey-display">••••••••••••••••••••••••••••••••</span>
           <div class="streamkey-buttons">
-            <button id="show-key-btn">Show</button>
-            <button id="copy-key-btn">Copy</button>
+            <button type="button" id="show-key-btn">Show</button>
+            <button type="button" id="copy-key-btn">Copy</button>
           </div>
         </div>
         <div class="expiry-text">Expires in <span id="key-expiry">90</span> days</div>
-        <button style="width: 100%; margin-top: 12px;" id="regenerate-key-btn">Regenerate Key</button>
+        <button type="button" style="width: 100%; margin-top: 12px;" id="regenerate-key-btn">Regenerate Key</button>
       </div>
     </div>
 
@@ -469,13 +469,13 @@
         <h2 class="panel-title">Profile Settings</h2>
         <div class="profile-field">
           <span class="value">Email: <strong id="profile-email"></strong></span>
-          <button>Change</button>
+          <button type="button">Change</button>
         </div>
         <div class="profile-field">
           <span class="value">Password</span>
-          <button>Change password</button>
+          <button type="button">Change password</button>
         </div>
-        <button class="danger" style="width: 100%; margin-top: 16px;" id="delete-account-btn">Delete Account</button>
+        <button type="button" class="danger" style="width: 100%; margin-top: 16px;" id="delete-account-btn">Delete Account</button>
       </div>
 
       <!-- Activity Log -->

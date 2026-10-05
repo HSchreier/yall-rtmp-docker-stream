@@ -359,7 +359,7 @@
     <div class="header-right">
       <span class="role-badge">ADMIN</span>
       <span id="admin-email" class="text-muted"></span>
-      <button class="secondary" id="logout-btn">Log out</button>
+      <button type="button" class="secondary" id="logout-btn">Log out</button>
     </div>
   </header>
 
@@ -367,21 +367,21 @@
     <div id="live-status" class="live-badge" style="display: none;">
       <span class="live-dot"></span>
       <span><strong id="streaming-user"></strong> is streaming now</span>
-      <button style="margin-left: auto; padding: 4px 12px;" id="deactivate-btn">Deactivate</button>
+      <button type="button" style="margin-left: auto; padding: 4px 12px;" id="deactivate-btn">Deactivate</button>
     </div>
 
     <div class="tabs">
-      <button class="tab active" data-tab="users">Users</button>
-      <button class="tab" data-tab="logs">Logs</button>
-      <button class="tab" data-tab="performance">Performance</button>
-      <button class="tab" data-tab="destinations">Destinations</button>
+      <button type="button" class="tab active" data-tab="users">Users</button>
+      <button type="button" class="tab" data-tab="logs">Logs</button>
+      <button type="button" class="tab" data-tab="performance">Performance</button>
+      <button type="button" class="tab" data-tab="destinations">Destinations</button>
     </div>
 
     <!-- Users Tab -->
     <div id="users" class="tab-content active">
       <div class="section-header">
         <h1 class="section-title">Users</h1>
-        <button class="create-btn" id="create-user-btn">+ Create user</button>
+        <button type="button" class="create-btn" id="create-user-btn">+ Create user</button>
       </div>
       <table>
         <thead>
@@ -526,9 +526,9 @@
           <td>${user.isActive ? '<span class="status-badge"></span>LIVE' : '—'}</td>
           <td>
             <div class="action-buttons">
-              ${!user.isActive ? `<button onclick="activateUser('${user.userId}')">Activate</button>` : `<button onclick="deactivateUser('${user.userId}')">Deactivate</button>`}
-              <button onclick="viewUser('${user.userId}')">View</button>
-              <button class="danger" onclick="deleteUser('${user.userId}')">Delete</button>
+              ${!user.isActive ? `<button type="button" onclick="activateUser('${user.userId}')">Activate</button>` : `<button type="button" onclick="deactivateUser('${user.userId}')">Deactivate</button>`}
+              <button type="button" onclick="viewUser('${user.userId}')">View</button>
+              <button type="button" class="danger" onclick="deleteUser('${user.userId}')">Delete</button>
             </div>
           </td>
         `;
