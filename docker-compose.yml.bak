@@ -17,8 +17,8 @@ services:
       - "1935:1935"
     environment:
       MONGO_URI: mongodb://mongo:27017/yallcast-dev
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-key-change-me}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev-encryption-key-64-hex-chars-minimum}
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       HTTP_PORT: "8080"
     # Security: drop all capabilities, add back only what's needed
     cap_drop:
