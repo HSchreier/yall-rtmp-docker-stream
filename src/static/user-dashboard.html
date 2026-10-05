@@ -505,8 +505,8 @@
 
   <script>
     const API_BASE = location.origin;
-    let authToken = localStorage.getItem('authToken');
-    let userId = localStorage.getItem('userId');
+    const authToken = localStorage.getItem('authToken');
+    const userId = localStorage.getItem('userId');
     let streamKeyVisible = false;
     let endpointVisible = false;
     let isStreaming = false;
@@ -566,7 +566,7 @@
         const key = data.streamKey;
         document.getElementById('streamkey-display').textContent = '•'.repeat(32);
         document.getElementById('streamkey-display').dataset.key = key;
-        const expiry = Math.floor((new Date(data.expiresAt) - new Date()) / (24 * 60 * 60 * 1000));
+        const expiry = Math.floor((new Date(data.expiresAt) - Date.now()) / (24 * 60 * 60 * 1000));
         document.getElementById('key-expiry').textContent = expiry;
         document.getElementById('rtmp-endpoint').textContent = `rtmp://relay.example.com/live/${key}`;
         document.getElementById('rtmp-endpoint').dataset.endpoint = `rtmp://relay.example.com/live/${key}`;
@@ -610,7 +610,7 @@
       document.getElementById('stream-timer').style.display = 'block';
       document.getElementById('stop-btn').style.display = 'block';
 
-      const elapsed = new Date() - streamStartTime;
+      const elapsed = Date.now()- streamStartTime;
       const hours = Math.floor(elapsed / (60 * 60 * 1000));
       const minutes = Math.floor((elapsed % (60 * 60 * 1000)) / (60 * 1000));
       const seconds = Math.floor((elapsed % (60 * 1000)) / 1000);

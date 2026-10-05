@@ -57,7 +57,7 @@
     const password = document.getElementById("password").value;
 
     try {
-      const res = await fetch(location.origin + "/auth/login", {
+      const res = await fetch(`${location.origin}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -81,7 +81,7 @@
       } else {
         location.href = "/user-dashboard.html";
       }
-    } catch (err) {
+    } catch {
       document.querySelector(".error-text").hidden = false;
       document.querySelector(".error-text").textContent = "Connection error";
     }
