@@ -117,6 +117,28 @@ Run these from the repo root:
 |---|---|
 | `./scripts/install.sh` | **One-shot local setup** — checks for Bun (installs if missing), verifies Docker is running, generates `.env` with secrets, runs `bun install`, starts Mongo container. Safe to re-run. |
 | `./docker/server.sh` | **Container startup & shutdown** — runs inside the Docker container as PID 1 (via `Dockerfile` CMD). Performs pre-flight validation (env vars, nginx binary, ports, MongoDB connectivity), spawns the compiled sidecar binary, and handles graceful SIGTERM/SIGINT shutdown (see [Server startup and shutdown](#server-startup-and-shutdown) below). |
+| `./scripts/test-local.sh` | **Local CI mirror** — runs all GitHub Actions checks locally before pushing (Biome lint, TypeScript check, gitleaks, spec sync, unit tests). **Blocks push if tests fail** via pre-push git hook. |
+
+## Testing before push
+
+**Always run local tests before pushing.** This catches formatting, type, and spec-sync errors locally instead of waiting for GitHub Actions:
+
+```bash
+# Manual run (useful during development)
+./scripts/test-local.sh
+
+# Automatic (blocks push if tests fail)
+git push    # Pre-push hook runs all checks automatically
+```
+
+The local test suite mirrors GitHub Actions exactly:
+- ✅ Biome lint + format check
+- ✅ TypeScript type check (strict mode)
+- ✅ Gitleaks secret scan
+- ✅ Spec sync check (openapi.yaml ↔ TECHNICAL.md)
+- ✅ Unit tests
+
+**Pre-push hook installed:** Push is blocked if any test fails. Fix the issue locally, then `git push` again.
 
 ## Working on the frontend
 
