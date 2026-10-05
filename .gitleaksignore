@@ -1,3 +1,0 @@
-# Development default secrets in docker-compose.yml
-# These are NOT production secrets, only used in local development
-# Format: <hash-from-gitleaks>
