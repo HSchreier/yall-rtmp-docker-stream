@@ -24,6 +24,8 @@ export interface UserDoc {
   role: Role;
   createdAt: Date;
   registeredBy: string | null;
+  streamKey: string;
+  streamKeyExpiry: Date;
 }
 
 interface UserRow {
@@ -33,6 +35,8 @@ interface UserRow {
   role: Role;
   createdAt: Date;
   registeredBy: string | null;
+  streamKey: string;
+  streamKeyExpiry: Date;
 }
 
 function toDoc(row: UserRow): UserDoc {
@@ -84,12 +88,16 @@ export class UserRepository {
     role: Role;
     registeredBy: string | null;
   }): Promise<UserDoc> {
+    const now = new Date();
+    const expiry = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000); // 90 days
     const row: Omit<UserRow, "_id"> = {
       email: input.email,
       passwordHash: input.passwordHash,
       role: input.role,
-      createdAt: new Date(),
+      createdAt: now,
       registeredBy: input.registeredBy,
+      streamKey: generateStreamKey(),
+      streamKeyExpiry: expiry,
     };
     const result = await this.#collection.insertOne(row);
     return toDoc({ ...row, _id: result.insertedId });
@@ -117,4 +125,30 @@ export class UserRepository {
     const result = await this.#collection.deleteOne({ _id: new ObjectId(userId) } as never);
     return result.deletedCount > 0;
   }
+
+  async regenerateStreamKey(userId: string): Promise<UserDoc | null> {
+    if (!ObjectId.isValid(userId)) return null;
+    const now = new Date();
+    const expiry = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000); // 90 days
+    const result = await this.#collection.findOneAndUpdate(
+      { _id: new ObjectId(userId) } as never,
+      { $set: { streamKey: generateStreamKey(), streamKeyExpiry: expiry } },
+      { returnDocument: "after" },
+    );
+    return result ? toDoc(result as UserRow) : null;
+  }
+
+  async findByStreamKey(streamKey: string): Promise<UserDoc | null> {
+    const row = await this.#collection.findOne({ streamKey });
+    return row ? toDoc(row as UserRow) : null;
+  }
+}
+
+function generateStreamKey(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let key = "";
+  for (let i = 0; i < 32; i++) {
+    key += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return key;
 }

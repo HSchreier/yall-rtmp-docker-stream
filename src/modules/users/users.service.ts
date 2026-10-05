@@ -51,6 +51,71 @@ export class UsersService {
     private readonly eventBus: EventBus,
   ) {}
 
+  async getSelf(userId: string): Promise<UserListEntry> {
+    const user = await this.users.findById(userId);
+    if (!user) throw new NotFoundError("User not found.");
+
+    const [hasProfile, activeUserId] = await Promise.all([
+      this.profiles.exists(userId),
+      this.relay.getActiveUserId(),
+    ]);
+
+    return {
+      userId: user.userId,
+      email: user.email,
+      role: user.role,
+      hasProfile,
+      isActive: user.userId === activeUserId,
+    };
+  }
+
+  async createUser(
+    input: { email: string; password: string; role?: string },
+    createdBy: string,
+  ): Promise<UserListEntry> {
+    if (!EMAIL_RE.test(input.email)) {
+      throw new ValidationError("Enter a valid email address.");
+    }
+    if (input.password.length < MIN_PASSWORD_LENGTH) {
+      throw new ValidationError(`Password needs at least ${MIN_PASSWORD_LENGTH} characters.`);
+    }
+
+    const existing = await this.users.findByEmail(input.email);
+    if (existing) {
+      throw new ConflictError("An account with that email already exists.");
+    }
+
+    const role = (input.role === "admin" ? "admin" : "user") as Role;
+    const passwordHash = await Bun.password.hash(input.password);
+    const user = await this.users.create({
+      email: input.email,
+      passwordHash,
+      role,
+      registeredBy: createdBy,
+    });
+
+    this.eventBus.emit("UserRegistered", {
+      userId: user.userId,
+      email: user.email,
+      role: user.role,
+      registeredBy: createdBy,
+      at: new Date(),
+    });
+
+    const [hasProfile, activeUserId] = await Promise.all([
+      this.profiles.exists(user.userId),
+      this.relay.getActiveUserId(),
+    ]);
+
+    return {
+      userId: user.userId,
+      email: user.email,
+      role: user.role,
+      hasProfile,
+      isActive: user.userId === activeUserId,
+    };
+  }
+
   async listWithStatus(): Promise<UserListEntry[]> {
     const [users, activeUserId] = await Promise.all([
       this.users.list(),
@@ -188,5 +253,34 @@ export class UsersService {
     await this.users.delete(targetUserId);
 
     this.eventBus.emit("UserRemoved", { userId: targetUserId, removedBy, at: new Date() });
+  }
+
+  async getStreamKey(userId: string): Promise<{ streamKey: string; expiresAt: Date }> {
+    const user = await this.users.findById(userId);
+    if (!user) throw new NotFoundError("User not found.");
+    return {
+      streamKey: user.streamKey,
+      expiresAt: user.streamKeyExpiry,
+    };
+  }
+
+  async regenerateStreamKey(
+    userId: string,
+    regeneratedBy: string,
+  ): Promise<{ streamKey: string; expiresAt: Date }> {
+    const user = await this.users.regenerateStreamKey(userId);
+    if (!user) throw new NotFoundError("User not found.");
+
+    this.eventBus.emit("UserUpdated", {
+      userId,
+      changedFields: ["streamKey"],
+      updatedBy: regeneratedBy,
+      at: new Date(),
+    });
+
+    return {
+      streamKey: user.streamKey,
+      expiresAt: user.streamKeyExpiry,
+    };
   }
 }

@@ -147,18 +147,24 @@ export async function bootstrap(): Promise<App> {
   // request filtering. Loads default rules from docker/wasp-rules.json.
   // Enabled by WASP_ENABLED env var (defaults to false).
   const waspEnabled = process.env.WASP_ENABLED?.toLowerCase() === "true";
-  const wasp = new WaspFilter(eventBus, logger, (defaultRules.rules as unknown as any[]).map((r) => ({
-    id: String(r.id),
-    severity: String(r.severity) as "soft" | "medium" | "hard",
-    type: String(r.type) as "rate-limit" | "pattern" | "behavioral",
-    enabled: Boolean(r.enabled),
-    description: String(r.description),
-    threshold: r.threshold,
-    window: r.window,
-    pattern: r.pattern,
-    fields: r.fields,
-    timeoutSecs: Number(r.timeoutSecs),
-  })), waspEnabled);
+  const wasp = new WaspFilter(
+    eventBus,
+    logger,
+    // biome-ignore lint/suspicious/noExplicitAny: JSON rules type narrowing
+    (defaultRules.rules as unknown as any[]).map((r) => ({
+      id: String(r.id),
+      severity: String(r.severity) as "soft" | "medium" | "hard",
+      type: String(r.type) as "rate-limit" | "pattern" | "behavioral",
+      enabled: Boolean(r.enabled),
+      description: String(r.description),
+      threshold: r.threshold,
+      window: r.window,
+      pattern: r.pattern,
+      fields: r.fields,
+      timeoutSecs: Number(r.timeoutSecs),
+    })),
+    waspEnabled,
+  );
   wasp.init();
 
   // Step 6: module routers — each owns its own routes and its own service.

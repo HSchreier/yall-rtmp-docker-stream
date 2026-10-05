@@ -26,7 +26,7 @@ export interface ActiveBlock {
 export class WaspFilter {
   private rules: Map<string, WaspRule> = new Map();
   private activeBlocks: Map<string, ActiveBlock> = new Map();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: Bun setInterval return type incompatibility
   private expireTimer: any = null;
   private enabled: boolean;
   private requestCounts: Map<string, number[]> = new Map(); // IP → array of request timestamps
@@ -52,10 +52,7 @@ export class WaspFilter {
       return;
     }
     this.logger.info({}, "WASP enabled — starting block expiry timer");
-    this.expireTimer = setInterval(
-      (() => this.checkExpiredBlocks()) as () => void,
-      10_000,
-    );
+    this.expireTimer = setInterval((() => this.checkExpiredBlocks()) as () => void, 10_000);
   }
 
   dispose() {
@@ -71,10 +68,7 @@ export class WaspFilter {
   setEnabled(enabled: boolean) {
     this.enabled = enabled;
     if (enabled && this.expireTimer === null) {
-      this.expireTimer = setInterval(
-        (() => this.checkExpiredBlocks()) as () => void,
-        10_000,
-      );
+      this.expireTimer = setInterval((() => this.checkExpiredBlocks()) as () => void, 10_000);
       this.logger.info({}, "WASP enabled");
     } else if (!enabled && this.expireTimer !== null) {
       clearInterval(this.expireTimer);
@@ -153,7 +147,7 @@ export class WaspFilter {
     }
 
     // Remove expired hard blocks (medium/soft auto-expire, hard needs manual unblock)
-    if (existing && existing.expiresAt && existing.expiresAt <= new Date()) {
+    if (existing?.expiresAt && existing.expiresAt <= new Date()) {
       this.activeBlocks.delete(ip);
     }
 

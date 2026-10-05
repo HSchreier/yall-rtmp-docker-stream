@@ -1,5 +1,5 @@
-import { jsonResponse } from "../../infra/http";
 import type { ModuleRouter } from "../../http-api";
+import { jsonResponse } from "../../infra/http";
 import type { WaspFilter, WaspRule } from "../../infra/wasp-filter";
 
 export class SettingsRouter implements ModuleRouter {
@@ -7,7 +7,6 @@ export class SettingsRouter implements ModuleRouter {
 
   async handle(req: Request, url: URL): Promise<Response | undefined> {
     const pathname = url.pathname;
-    console.log("[SettingsRouter] checking", req.method, pathname);
 
     if (req.method === "GET" && pathname === "/settings/security/rules") {
       return this.handleGetRules();
@@ -71,7 +70,9 @@ export class SettingsRouter implements ModuleRouter {
       this.wasp.addRule(rule);
       return jsonResponse(201, { rule });
     } catch (e) {
-      return jsonResponse(400, { error: `Invalid rule: ${e instanceof Error ? e.message : String(e)}` });
+      return jsonResponse(400, {
+        error: `Invalid rule: ${e instanceof Error ? e.message : String(e)}`,
+      });
     }
   }
 
@@ -86,7 +87,9 @@ export class SettingsRouter implements ModuleRouter {
       if (e instanceof Error && e.message.includes("not found")) {
         return jsonResponse(404, { error: e.message });
       }
-      return jsonResponse(400, { error: `Failed to update rule: ${e instanceof Error ? e.message : String(e)}` });
+      return jsonResponse(400, {
+        error: `Failed to update rule: ${e instanceof Error ? e.message : String(e)}`,
+      });
     }
   }
 
@@ -94,7 +97,7 @@ export class SettingsRouter implements ModuleRouter {
     try {
       this.wasp.removeRule(ruleId);
       return jsonResponse(200, { ok: true });
-    } catch (e) {
+    } catch {
       return jsonResponse(404, { error: `Rule not found: ${ruleId}` });
     }
   }
@@ -128,7 +131,9 @@ export class SettingsRouter implements ModuleRouter {
       this.wasp.addToAllowlist(cidr);
       return jsonResponse(200, { ok: true, cidr });
     } catch (e) {
-      return jsonResponse(400, { error: `Invalid request: ${e instanceof Error ? e.message : String(e)}` });
+      return jsonResponse(400, {
+        error: `Invalid request: ${e instanceof Error ? e.message : String(e)}`,
+      });
     }
   }
 
@@ -143,7 +148,9 @@ export class SettingsRouter implements ModuleRouter {
       this.wasp.setEnabled(enabled);
       return jsonResponse(200, { ok: true, enabled });
     } catch (e) {
-      return jsonResponse(400, { error: `Invalid request: ${e instanceof Error ? e.message : String(e)}` });
+      return jsonResponse(400, {
+        error: `Invalid request: ${e instanceof Error ? e.message : String(e)}`,
+      });
     }
   }
 }

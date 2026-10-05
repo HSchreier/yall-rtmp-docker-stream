@@ -24,11 +24,25 @@ export class UsersRouter {
   async handle(req: Request, url: URL): Promise<Response | undefined> {
     const { pathname } = url;
 
+    if (pathname === "/users/me" && req.method === "GET") {
+      const session = requireAuth(req, this.auth);
+      const user = await this.usersService.getSelf(session.userId);
+      return jsonResponse(200, user);
+    }
+
     if (pathname === "/users" && req.method === "GET") {
       const session = requireAuth(req, this.auth);
       this.auth.requireAdmin(session);
       const users = await this.usersService.listWithStatus();
       return jsonResponse(200, { users });
+    }
+
+    if (pathname === "/users" && req.method === "POST") {
+      const session = requireAuth(req, this.auth);
+      this.auth.requireAdmin(session);
+      const body = await readJson<{ email: string; password: string; role?: string }>(req);
+      const user = await this.usersService.createUser(body, session.userId);
+      return jsonResponse(201, user);
     }
 
     const activateTargetId = pathname.match(ACTIVATE_USER_RE)?.[1];
@@ -52,6 +66,30 @@ export class UsersRouter {
       this.auth.requireAdmin(session);
       await this.usersService.deleteUser(targetUserId, session.userId);
       return jsonResponse(200, { userId: targetUserId, deleted: true });
+    }
+
+    const streamKeyTargetId = pathname.match(/^\/users\/([^/]+)\/streamkey$/)?.[1];
+    if (streamKeyTargetId && req.method === "GET") {
+      const session = requireAuth(req, this.auth);
+      const isSelf = session.userId === streamKeyTargetId;
+      if (!isSelf && session.role !== "admin") {
+        return jsonResponse(403, { error: "Forbidden" });
+      }
+      const streamKey = await this.usersService.getStreamKey(streamKeyTargetId);
+      return jsonResponse(200, streamKey);
+    }
+
+    if (streamKeyTargetId && req.method === "POST") {
+      const session = requireAuth(req, this.auth);
+      const isSelf = session.userId === streamKeyTargetId;
+      if (!isSelf && session.role !== "admin") {
+        return jsonResponse(403, { error: "Forbidden" });
+      }
+      const streamKey = await this.usersService.regenerateStreamKey(
+        streamKeyTargetId,
+        session.userId,
+      );
+      return jsonResponse(200, streamKey);
     }
 
     return undefined;
