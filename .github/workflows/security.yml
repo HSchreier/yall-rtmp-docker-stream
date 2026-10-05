@@ -28,13 +28,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # full history so gitleaks can scan all commits on the branch
+          fetch-depth: 0
       - name: Run gitleaks
         run: |
           VERSION=8.18.4
           curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
             | tar -xz gitleaks
-          ./gitleaks detect --source . --redact --no-banner --exit-code 1
+          ./gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --exit-code 1
 
   sast:
     name: SAST (Semgrep)
