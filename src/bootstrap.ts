@@ -21,6 +21,7 @@ import { MongoService } from "./infra/mongo-service.ts";
 import { AuthRouter } from "./modules/auth/auth.router.ts";
 import { AuthService } from "./modules/auth/auth.service.ts";
 import { HealthRouter } from "./modules/health/health.router.ts";
+import { MetricsRouter } from "./modules/metrics/metrics.router.ts";
 import { DestinationProfileRepository } from "./modules/profiles/profiles.repository.ts";
 import { ProfilesRouter } from "./modules/profiles/profiles.router.ts";
 import { ProfileService } from "./modules/profiles/profiles.service.ts";
@@ -145,6 +146,7 @@ export async function bootstrap(): Promise<App> {
     new ProfilesRouter(profileService, auth),
     new HealthRouter(mongo),
     new RelayRouter(ingestEventReceiver),
+    new MetricsRouter(),
   ];
 
   // Step 7: HttpApi last — binds the listener only once everything it
@@ -157,6 +159,47 @@ export async function bootstrap(): Promise<App> {
     httpPort: config.get().httpPort,
   });
   await httpApi.init();
+
+  // Step 8: Wire up graceful shutdown handlers. SIGTERM (sent by
+  // `docker-compose down`) or SIGINT (Ctrl+C) trigger dispose() on all
+  // modules in reverse-dependency order: HTTP first (stop accepting
+  // requests), then nginx (stop accepting RTMP pushes), then Mongo (close
+  // connection pool). Each dispose() is idempotent and swallows errors;
+  // we log and continue through the shutdown sequence. After all modules
+  // are disposed, exit with code 0.
+  let shutdownInProgress = false;
+  const handleShutdown = async (signal: string) => {
+    if (shutdownInProgress) return; // Debounce multiple signals
+    shutdownInProgress = true;
+    // AUDIT: Log signal receipt for compliance & debugging
+    logger.warn(
+      { signal, pid: process.pid, timestamp: new Date().toISOString() },
+      "AUDIT: shutdown signal received — disposing modules",
+    );
+
+    try {
+      logger.info({}, "Stopping HTTP server");
+      httpApi.dispose();
+
+      logger.info({}, "Stopping nginx");
+      nginxProcessManager.dispose();
+
+      logger.info({}, "Closing MongoDB");
+      await mongo.dispose();
+
+      logger.info({}, "Shutdown complete");
+      process.exit(0);
+    } catch (err) {
+      logger.error(
+        { err: err instanceof Error ? err.message : String(err) },
+        "Error during shutdown (exiting with error code)",
+      );
+      process.exit(1);
+    }
+  };
+
+  process.on("SIGTERM", () => handleShutdown("SIGTERM"));
+  process.on("SIGINT", () => handleShutdown("SIGINT"));
 
   return {
     logger,

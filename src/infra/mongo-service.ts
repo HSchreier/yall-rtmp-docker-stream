@@ -59,8 +59,19 @@ export class MongoService {
     this.logger.info({}, "MongoService: connected");
   }
 
-  async close(): Promise<void> {
-    await this.#client?.close();
+  // dispose() — gracefully close the MongoDB connection. Called during
+  // shutdown to cleanly drain in-flight operations and release the
+  // connection pool. Safe to call multiple times (idempotent).
+  async dispose(): Promise<void> {
+    if (!this.#client) return;
+    try {
+      await this.#client.close();
+    } catch (err) {
+      this.logger.error(
+        { err: err instanceof Error ? err.message : String(err) },
+        "MongoService.dispose: close threw (continuing shutdown)",
+      );
+    }
   }
 
   db(): Db {
