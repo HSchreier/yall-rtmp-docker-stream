@@ -1,5 +1,5 @@
-import type { ModuleRouter } from '../../http-api';
-import { MetricsService } from '../../infra/metrics-service';
+import type { ModuleRouter } from "../../http-api";
+import { MetricsService } from "../../infra/metrics-service";
 
 export class MetricsRouter implements ModuleRouter {
   private metricsService = new MetricsService();
@@ -8,19 +8,19 @@ export class MetricsRouter implements ModuleRouter {
     const path = url.pathname;
 
     // JSON API endpoint for metrics
-    if (path === '/api/metrics' && req.method === 'GET') {
+    if (path === "/api/metrics" && req.method === "GET") {
       const metrics = this.metricsService.getMetrics();
       return new Response(JSON.stringify(metrics), {
         status: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
     // HTML dashboard
-    if (path === '/metrics/dashboard' && req.method === 'GET') {
+    if (path === "/metrics/dashboard" && req.method === "GET") {
       return new Response(this.getDashboardHTML(), {
         status: 200,
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        headers: { "Content-Type": "text/html; charset=utf-8" },
       });
     }
 

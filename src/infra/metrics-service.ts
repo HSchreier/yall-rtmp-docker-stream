@@ -1,4 +1,4 @@
-import { cpus, freemem, totalmem, uptime } from 'node:os';
+import { cpus, freemem, totalmem, uptime } from "node:os";
 
 interface ProcessMetrics {
   pid: number;
