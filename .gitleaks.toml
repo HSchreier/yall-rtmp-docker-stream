@@ -4,8 +4,12 @@ description = "Allowlist for this repo"
 [extend]
 useDefault = true
 
-# Allowlist all commits that only touch documentation/config
-# since we removed all actual hardcoded secrets
-[[allowlist]]
-description = "Documentation and comments mentioning secrets (no real credentials)"
-commits = ["HEAD"]
+[allowlist]
+paths = [
+  "README.md",
+  "openapi.yaml",
+  "TECHNICAL.md",
+  ".semgrep/security.yml",
+  ".env.example",
+  "docker-compose.yml"
+]
