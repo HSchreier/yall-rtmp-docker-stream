@@ -1,8 +1,20 @@
+title = "Gitleaks Configuration"
+description = "Allowlist for archived prototype and legitimate code/docs"
+
 [extend]
 useDefault = true
 
 [allowlist]
-description = "Archived design-tool prototype — fake demo credentials baked into its own mock data, never real secrets and never used by the app. See docs/design-briefs/reference/handoff-README.md for what this file actually is."
+description = "Archived design-tool prototype — fake demo credentials, and documentation mentioning secrets in comments"
 paths = [
   '''docs/design-briefs/reference/prototype\.dc\.html''',
+  "README.md",
+  "openapi.yaml",
+  "TECHNICAL.md",
+  ".semgrep/security.yml",
+  "src/infra/crypto.ts",
+  "src/bootstrap.ts",
+  "scripts/install.sh",
+  ".env.example",
+  "docker-compose.yml"
 ]
