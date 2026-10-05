@@ -3,13 +3,11 @@
 #  Ya'll Cast — Local Install
 #  https://github.com/HSchreier/yall-rtmp-docker-stream
 # ─────────────────────────────────────────────────────────────────────────────
-# Mirrors the shape of Stagebox's own scripts/install-mac.sh — check each
-# prerequisite, install what's safe to install automatically (Bun, via its
-# own official installer), stop and hand off for anything that needs a GUI
-# or license acceptance (Docker Desktop), then wire up .env and start
-# everything. Cross-platform (macOS/Linux) since Bun + Docker both are —
-# this project has no macOS-only dependency the way Stagebox's ffmpeg/
-# Homebrew install does.
+# Check each prerequisite, install what's safe to install automatically
+# (Bun, via its own official installer), stop and hand off for anything
+# that needs a GUI or license acceptance (Docker Desktop), then wire up
+# .env and start everything. Cross-platform (macOS/Linux) since Bun +
+# Docker both are.
 set -euo pipefail
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
