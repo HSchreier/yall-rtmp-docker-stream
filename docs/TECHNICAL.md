@@ -409,6 +409,72 @@ Two tiers: `staging` (integration branch, expected to stay green), `main` (only 
 >
 > A later version of this doc had the sidecar polling nginx's `/stat` endpoint every 2s to detect ingest liveness, and then simply dropped byte/bitrate counters entirely once that poller was removed. Both were wrong: liveness detection moved to nginx's own `on_publish`/`on_publish_done` webhooks (push, not poll — genuinely more accurate, not just more "pure"), and the counters came back as `StreamStatsSession`, a per-broadcast object with its own bounded timer, created on `StreamStarted` and disposed on `StreamEnded`/`nginx.crashed`. The fix wasn't "delete the feature to satisfy the no-polling rule," it was "scope the timer to the event that justifies it."
 
+## Security hardening — three phases
+
+Layered defense model: process isolation, resource constraints, and application-level filtering.
+
+### Phase 1: Process isolation & capability dropping
+
+**In Dockerfile:**
+- `umask 0077` — restricts log file creation to owner-only (`0600`, not `0644`)
+- Non-root user `sidecar` — sidecar runs as non-root; nginx runs as `nobody`
+- Pre-created `/app/.logs` directory with correct ownership — ensures non-root user can write
+
+**In docker-compose.yml:**
+- `cap_drop: [ALL]` — remove all Linux capabilities
+- `cap_add: [NET_BIND_SERVICE]` — add back only what's needed (to bind ports `< 1024`)
+
+**In bootstrap.ts:**
+- Signal audit logging — log every `SIGTERM`/`SIGINT` with timestamp, PID, and reason (compliance trail)
+
+**Scope:** prevents container escape, limits damage if sidecar is compromised. Does not prevent resource exhaustion or malicious requests.
+
+### Phase 2: Resource limits
+
+**In docker-compose.yml:**
+- Memory: 512M hard limit, 256M reserved
+- CPU: 1.0 hard limit, 0.5 reserved
+- File descriptor limit: 4096–8192
+- Process limit: 512–1024
+
+**Scope:** prevents resource exhaustion (OOM, runaway processes, file descriptor leaks). Does not filter requests or protect against slowloris-style attacks.
+
+### Phase 3: Web Application Security Proxy (WASP)
+
+**iptables-backed request filtering — sidecar module, admin toggles via dashboard:**
+
+Three-tier rule system (configurable thresholds, very low defaults but tunable):
+
+1. **Soft block (rate limiting)** — default 5 req/sec per IP; 300s timeout, auto-unblock
+2. **Medium block (pattern matching)** — SQL injection, path traversal, command injection patterns in URL/headers/body; 3600s timeout
+3. **Hard block (behavioral heuristics)** — repeated 4xx errors, malformed protocol; manual admin override required
+
+**Features:**
+- Rule sources: bundled JSON (`docker/wasp-rules.json`) + GitHub URLs (admin configurable, hot-reload)
+- Rule operations: enable/disable per rule, adjust thresholds, remove rules on-the-fly
+- Allowlist CIDR ranges: exempt trusted IPs (monitoring, health checks)
+- Auto-unblock: blocks expire after timeout; admin can unblock early via dashboard
+- Audit trail: every block emitted as `SecurityEvent` → `AuditLogger` → structured logs
+
+**Endpoints:**
+- `GET /settings/security/rules` — list all rules (source, enabled/disabled, thresholds)
+- `POST /settings/security/rules` — add new rule
+- `PATCH /settings/security/rules/{ruleId}` — toggle/adjust/update rule
+- `DELETE /settings/security/rules/{ruleId}` — remove rule immediately
+- `GET /settings/security/blocks` — current active blocks (IP, rule, timeout, pattern)
+- `POST /settings/security/blocks/{ip}/whitelist` — unblock before timeout
+- `POST /settings/security/allowlist` — add CIDR to exempt list (e.g., `10.0.0.0/8`, `127.0.0.1`)
+
+**Admin panel:**
+- Toggle WASP on/off (bootstrap with `WASP_ENABLED` env var or dashboard toggle)
+- View active blocks with matching rule + pattern
+- Whitelist/unblock IPs
+- Edit rule thresholds in real-time
+- Import rules from GitHub URLs
+- View audit log of all blocks
+
+**Scope:** filters malicious requests at kernel level (iptables), prevents pattern-based attacks and resource exhaustion via rate limiting. Does not protect against authenticated attack (relies on auth layer for that).
+
 ## Data objects
 
 Every typed shape referenced above, in one place. EventBus payloads and Mongo documents are settled by the design above; the HTTP request/response and in-memory snapshot shapes below are drafts synthesized for completeness — they were only named as routes/services earlier, never given a field list, so treat them as a starting proposal, not a decision.
@@ -446,6 +512,13 @@ Every typed shape referenced above, in one place. EventBus payloads and Mongo do
 | Event | Shape |
 |---|---|
 | `StreamStatUpdated` | `{ streamKey, bytesIn, bitrateKbps, at }` |
+
+### EventBus payloads — Security events
+
+| Event | Shape |
+|---|---|
+| `SecurityEvent` | `{ ip, rule, severity: 'soft' \| 'medium' \| 'hard', action: 'blocked' \| 'unblocked', pattern, timeout, at }` — emitted every time WASP filters a request (soft), matches a pattern (medium), or blocks behavior (hard); `pattern` is the rule's regex if applicable, `timeout` is the auto-unblock time in seconds |
+| `BlockExpired` | `{ ip, rule, at }` — emitted when an auto-unblock timeout expires and iptables rule is removed |
 
 ### EventBus payloads — Log events
 
