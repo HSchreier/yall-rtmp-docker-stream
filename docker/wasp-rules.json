@@ -1,0 +1,52 @@
+{
+  "version": "1.0.0",
+  "rules": [
+    {
+      "id": "rate-limit-soft",
+      "severity": "soft",
+      "type": "rate-limit",
+      "enabled": true,
+      "description": "Block after 5 requests/sec for 300s (auto-unblock)",
+      "threshold": 5,
+      "window": 1,
+      "timeoutSecs": 300
+    },
+    {
+      "id": "sql-injection",
+      "severity": "medium",
+      "type": "pattern",
+      "enabled": true,
+      "description": "Block SQL injection patterns",
+      "pattern": "UNION.*SELECT|DROP.*TABLE|INSERT.*INTO|DELETE.*FROM|';.*--",
+      "fields": ["url", "body"],
+      "timeoutSecs": 3600
+    },
+    {
+      "id": "path-traversal",
+      "severity": "medium",
+      "type": "pattern",
+      "enabled": true,
+      "description": "Block path traversal attempts",
+      "pattern": "\\.\\./|\\.\\\\|%2e%2e|%252e",
+      "fields": ["url"],
+      "timeoutSecs": 3600
+    },
+    {
+      "id": "command-injection",
+      "severity": "medium",
+      "type": "pattern",
+      "enabled": true,
+      "description": "Block shell command injection patterns",
+      "pattern": "\\$\\(|`|\\||;.*bash|exec|sh -c",
+      "fields": ["url", "body"],
+      "timeoutSecs": 3600
+    }
+  ],
+  "externalSources": [
+    {
+      "url": "https://raw.githubusercontent.com/owasp/www-project-modsecurity-core-rule-set/v3.3/rules/REQUEST-901-INITIALIZATION.conf",
+      "updateInterval": 604800,
+      "enabled": false
+    }
+  ]
+}

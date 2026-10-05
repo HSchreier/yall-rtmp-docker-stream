@@ -13,11 +13,13 @@
 // module, not something introduced by step 7; flagged, not silently left
 // implicit.
 
+import defaultRules from "../docker/wasp-rules.json" with { type: "json" };
 import { HttpApi, type ModuleRouter } from "./http-api.ts";
 import { ConfigService } from "./infra/config-service.ts";
 import { EventBus } from "./infra/event-bus.ts";
 import { Logger } from "./infra/logger.ts";
 import { MongoService } from "./infra/mongo-service.ts";
+import { WaspFilter } from "./infra/wasp-filter.ts";
 import { AuthRouter } from "./modules/auth/auth.router.ts";
 import { AuthService } from "./modules/auth/auth.service.ts";
 import { HealthRouter } from "./modules/health/health.router.ts";
@@ -33,6 +35,7 @@ import { StreamIdleDetector } from "./modules/relay/stream-idle-detector.ts";
 import { StreamOrchestrator } from "./modules/relay/stream-orchestrator.ts";
 import { StreamState } from "./modules/relay/stream-state.ts";
 import { StreamStatsSession } from "./modules/relay/stream-stats-session.ts";
+import { SettingsRouter } from "./modules/settings/settings.router.ts";
 import { UserRepository } from "./modules/users/users.repository.ts";
 import { UsersRouter } from "./modules/users/users.router.ts";
 import { UsersService } from "./modules/users/users.service.ts";
@@ -49,6 +52,7 @@ export interface App {
   readonly nginxProcessManager: NginxProcessManager;
   readonly streamState: StreamState;
   readonly streamOrchestrator: StreamOrchestrator;
+  readonly wasp: WaspFilter;
   readonly httpApi: HttpApi;
 }
 
@@ -139,6 +143,24 @@ export async function bootstrap(): Promise<App> {
   const profileService = new ProfileService(destinationProfiles, relayState);
   const ingestEventReceiver = new IngestEventReceiver(destinationProfiles, relayState, eventBus);
 
+  // Step 5b: WaspFilter — Phase 3 security hardening via iptables-backed
+  // request filtering. Loads default rules from docker/wasp-rules.json.
+  // Enabled by WASP_ENABLED env var (defaults to false).
+  const waspEnabled = process.env.WASP_ENABLED?.toLowerCase() === "true";
+  const wasp = new WaspFilter(eventBus, logger, (defaultRules.rules as unknown as any[]).map((r) => ({
+    id: String(r.id),
+    severity: String(r.severity) as "soft" | "medium" | "hard",
+    type: String(r.type) as "rate-limit" | "pattern" | "behavioral",
+    enabled: Boolean(r.enabled),
+    description: String(r.description),
+    threshold: r.threshold,
+    window: r.window,
+    pattern: r.pattern,
+    fields: r.fields,
+    timeoutSecs: Number(r.timeoutSecs),
+  })), waspEnabled);
+  wasp.init();
+
   // Step 6: module routers — each owns its own routes and its own service.
   const routers: ModuleRouter[] = [
     new AuthRouter(auth, users),
@@ -147,6 +169,7 @@ export async function bootstrap(): Promise<App> {
     new HealthRouter(mongo),
     new RelayRouter(ingestEventReceiver),
     new MetricsRouter(),
+    new SettingsRouter(wasp),
   ];
 
   // Step 7: HttpApi last — binds the listener only once everything it
@@ -181,6 +204,9 @@ export async function bootstrap(): Promise<App> {
       logger.info({}, "Stopping HTTP server");
       httpApi.dispose();
 
+      logger.info({}, "Stopping WASP filter");
+      wasp.dispose();
+
       logger.info({}, "Stopping nginx");
       nginxProcessManager.dispose();
 
@@ -213,6 +239,7 @@ export async function bootstrap(): Promise<App> {
     nginxProcessManager,
     streamState,
     streamOrchestrator,
+    wasp,
     httpApi,
   };
 }

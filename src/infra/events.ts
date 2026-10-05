@@ -94,6 +94,22 @@ export interface LogEvent {
   at: Date;
 }
 
+// Security events — WASP request filtering
+export interface SecurityEvent {
+  ip: string;
+  rule: string;
+  severity: "soft" | "medium" | "hard";
+  action: "blocked" | "unblocked";
+  pattern?: string;
+  timeout: number;
+  at: Date;
+}
+export interface BlockExpired {
+  ip: string;
+  rule: string;
+  at: Date;
+}
+
 // Process/infra — not a domain of their own, but on the same bus
 export interface NginxStarted {
   at: Date;
@@ -123,6 +139,8 @@ export interface EventMap {
   StreamIdle: StreamIdle;
   StreamResumed: StreamResumed;
   StreamStatUpdated: StreamStatUpdated;
+  SecurityEvent: SecurityEvent;
+  BlockExpired: BlockExpired;
   LogEvent: LogEvent;
   "nginx.started": NginxStarted;
   "nginx.exited": NginxExited;
