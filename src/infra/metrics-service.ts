@@ -1,4 +1,4 @@
-import { cpus, totalmem, freemem, uptime } from 'os';
+import { cpus, freemem, totalmem, uptime } from 'node:os';
 
 interface ProcessMetrics {
   pid: number;
@@ -33,7 +33,6 @@ interface PerformanceMetrics {
 
 export class MetricsService {
   private lastCpuUsage = process.cpuUsage();
-  private lastTimestamp = Date.now();
 
   getProcessMetrics(): ProcessMetrics {
     const memUsage = process.memoryUsage();
