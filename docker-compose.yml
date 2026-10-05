@@ -6,14 +6,24 @@ services:
     volumes:
       - mongo-data:/data/db
 
-  # relay service (nginx + compiled sidecar) isn't added here yet — the
-  # Dockerfile exists and builds/runs standalone (verified: nginx-rtmp-
-  # module compiles in, the sidecar boots and connects out to this mongo
-  # service via host.docker.internal), but NginxConfigRenderer/
-  # NginxProcessManager don't exist yet, so nginx inside that image is
-  # never actually started — see docs/TECHNICAL.md's build order, step 7.
-  # For now, run the sidecar directly with `bun run dev` against this mongo
-  # service (MONGO_URI=mongodb://localhost:27117/...).
+  relay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - mongo
+    ports:
+      - "8080:8080"
+      - "1935:1935"
+    environment:
+      MONGO_URI: mongodb://mongo:27017/yallcast-dev
+      HTTP_PORT: "8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 
 volumes:
   mongo-data:
