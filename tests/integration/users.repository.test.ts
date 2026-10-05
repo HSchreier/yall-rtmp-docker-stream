@@ -17,7 +17,7 @@ describe("UserRepository (integration — requires live Mongo)", () => {
   });
 
   afterAll(async () => {
-    await mongo.close();
+    await mongo.dispose();
   });
 
   beforeEach(async () => {
