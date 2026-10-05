@@ -51,10 +51,40 @@
     notice.textContent = "Setup is already complete — log in.";
   }
 
-  Yallcast.bindForm("#login-form", async (data) => {
-    const res = await Yallcast.api("POST", "/auth/login", data);
-    if (res.ok) location.href = "/dashboard.html";
-    return res;
+  document.getElementById("login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+
+    try {
+      const res = await fetch(location.origin + "/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        document.querySelector(".error-text").hidden = false;
+        document.querySelector(".error-text").textContent = data.error || "Login failed";
+        return;
+      }
+
+      // Store auth token and user info
+      localStorage.setItem("authToken", data.token);
+      localStorage.setItem("userId", data.userId);
+      localStorage.setItem("userRole", data.role);
+
+      // Route by role
+      if (data.role === "admin") {
+        location.href = "/admin-dashboard.html";
+      } else {
+        location.href = "/user-dashboard.html";
+      }
+    } catch (err) {
+      document.querySelector(".error-text").hidden = false;
+      document.querySelector(".error-text").textContent = "Connection error";
+    }
   });
 </script>
 </body>
