@@ -95,6 +95,8 @@ Destination stream keys (Mixcloud/YouTube/Twitch) are **not** env vars — they 
 
 ## Available scripts
 
+### Development commands
+
 Run these from the repo root:
 
 | Command | What it does |
@@ -109,6 +111,35 @@ Run these from the repo root:
 | `bun run test:integration` | Integration tests (`tests/integration/`) — needs the Mongo container running (`docker compose up -d mongo`). |
 | `bun run check:spec-sync` | Verifies `openapi.yaml` and `docs/TECHNICAL.md` haven't drifted apart. Runs in CI on every push. |
 
+### Shell scripts
+
+| Script | What it does |
+|---|---|
+| `./scripts/install.sh` | **One-shot local setup** — checks for Bun (installs if missing), verifies Docker is running, generates `.env` with secrets, runs `bun install`, starts Mongo container. Safe to re-run. |
+| `./docker/server.sh` | **Container startup & shutdown** — runs inside the Docker container as PID 1 (via `Dockerfile` CMD). Performs pre-flight validation (env vars, nginx binary, ports, MongoDB connectivity), spawns the compiled sidecar binary, and handles graceful SIGTERM/SIGINT shutdown (see [Server startup and shutdown](#server-startup-and-shutdown) below). |
+| `./scripts/test-local.sh` | **Local CI mirror** — runs all GitHub Actions checks locally before pushing (Biome lint, TypeScript check, gitleaks, spec sync, unit tests). **Blocks push if tests fail** via pre-push git hook. |
+
+## Testing before push
+
+**Always run local tests before pushing.** This catches formatting, type, and spec-sync errors locally instead of waiting for GitHub Actions:
+
+```bash
+# Manual run (useful during development)
+./scripts/test-local.sh
+
+# Automatic (blocks push if tests fail)
+git push    # Pre-push hook runs all checks automatically
+```
+
+The local test suite mirrors GitHub Actions exactly:
+- ✅ Biome lint + format check
+- ✅ TypeScript type check (strict mode)
+- ✅ Gitleaks secret scan
+- ✅ Spec sync check (openapi.yaml ↔ TECHNICAL.md)
+- ✅ Unit tests
+
+**Pre-push hook installed:** Push is blocked if any test fails. Fix the issue locally, then `git push` again.
+
 ## Working on the frontend
 
 The dashboard (`src/static/*.html`, `app.js`, `app.css`) is served as static files, read into memory **once** at boot — it is **not** in Bun's `--watch` dependency graph. If you edit anything under `src/static/`, you need to restart the dev server for the change to show up:
@@ -119,6 +150,48 @@ bun run dev
 ```
 
 Editing `src/**/*.ts` (routes, services, repositories) does auto-restart via `--watch`.
+
+## Server startup and shutdown
+
+### Docker deployment (`docker/server.sh`)
+
+When running inside Docker (via `docker compose up`), the sidecar is started by `docker/server.sh`, which:
+
+**Startup phase:**
+1. Validates environment variables (MONGO_URI, HTTP_PORT, JWT_SECRET, ENCRYPTION_KEY)
+2. Checks nginx binary exists and is executable
+3. Tests MongoDB connectivity
+4. Verifies ports 8080, 1935, 8090 are available
+5. Logs all checks to `.logs/` directory with per-module error logging
+6. Spawns the compiled Bun sidecar binary as PID 1
+
+**Shutdown phase** (triggered by `docker compose down` / `docker compose stop`):
+1. Receives SIGTERM or SIGINT signal
+2. Stops HTTP server (closes listening socket, allows in-flight requests to finish)
+3. Stops nginx (sends graceful SIGTERM to nginx master process)
+4. Closes MongoDB connection pool
+5. Exits cleanly (exit code 0)
+
+Each shutdown step is **idempotent** (safe to call multiple times) and **error-tolerant** (errors are logged, shutdown continues).
+
+**Usage:**
+```bash
+docker compose up -d                 # starts the relay container
+docker compose stop                  # graceful shutdown (SIGTERM)
+docker compose down                  # stop + remove containers
+docker compose logs relay            # see startup/shutdown logs
+```
+
+See [`docs/SHUTDOWN.md`](docs/SHUTDOWN.md) for complete shutdown reference and implementation details.
+
+### Local development
+
+When running `bun run dev` on your host:
+- The sidecar runs directly (not via `docker/server.sh`)
+- `Ctrl+C` sends SIGINT → graceful shutdown
+- Pre-flight validation still runs (same code path as Docker)
+
+The nginx instance lives inside the `docker-compose.yml` relay service only — during local development, nginx is not started locally (the relay Dockerfile is not used).
 
 ## Project layout
 
@@ -150,18 +223,21 @@ src/
   static/                    the dashboard UI (plain HTML/CSS/JS, no build step)
 docker/
   nginx.conf.template        the template NginxConfigRenderer fills in per active profile
+  server.sh                  container startup & shutdown script (runs as PID 1, pre-flight validation, graceful SIGTERM handling)
 Dockerfile                   3-stage build: nginx+rtmp-module, Bun sidecar compile, runtime
 scripts/
-  install.sh                  one-shot local install (see Quick start)
-  check-spec-sync.ts           openapi.yaml <-> TECHNICAL.md drift check
+  install.sh                 one-shot local install (see Quick start)
+  check-spec-sync.ts         openapi.yaml <-> TECHNICAL.md drift check
 tests/
-  unit/                        no external deps
-  integration/                 needs a live Mongo (MONGO_TEST_URI, defaults to the docker-compose one)
+  unit/                      no external deps
+  integration/               needs a live Mongo (MONGO_TEST_URI, defaults to the docker-compose one)
 docs/
-  TECHNICAL.md                 source of truth — read this before writing any code
-  ARCHITECTURE.md              short, dated decision log
-  design-briefs/               screen/journey specs for the dashboard UI
-openapi.yaml                   second source of truth — the API contract
+  TECHNICAL.md               source of truth — read this before writing any code
+  ARCHITECTURE.md            short, dated decision log
+  SHUTDOWN.md                server startup/shutdown reference, module dispose methods, testing procedures
+  STEP8-INFRASTRUCTURE.md    build order step 8: bootstrap script, graceful shutdown, documentation
+  design-briefs/             screen/journey specs for the dashboard UI
+openapi.yaml                 second source of truth — the API contract
 ```
 
 ## API overview
@@ -186,10 +262,15 @@ Full contract lives in [`openapi.yaml`](openapi.yaml) (kept in sync with `docs/T
 
 Read in this order before touching code:
 
-1. [`docs/TECHNICAL.md`](docs/TECHNICAL.md) — architecture, module design, event taxonomy, persistence, auth, error handling, CI/CD, security suite. **The source of truth.**
+1. [`docs/TECHNICAL.md`](docs/TECHNICAL.md) — **The source of truth.** Architecture, module design, event taxonomy, persistence, auth, error handling, CI/CD, security suite, build order.
 2. [`openapi.yaml`](openapi.yaml) — the API contract. Never invent an endpoint that isn't here.
 3. [`docs/design-briefs/screens-and-journeys.md`](docs/design-briefs/screens-and-journeys.md) — every screen and user journey for the dashboard UI.
 4. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — short decision log with dates, for the "why" behind past calls.
+
+### Additional references
+
+- [`docs/SHUTDOWN.md`](docs/SHUTDOWN.md) — graceful shutdown reference, module dispose methods, Docker timeout behavior, testing procedures
+- [`docs/STEP8-INFRASTRUCTURE.md`](docs/STEP8-INFRASTRUCTURE.md) — build order step 8: bootstrap script, pre-flight validation, shutdown infrastructure implementation summary
 
 ## Contributing
 

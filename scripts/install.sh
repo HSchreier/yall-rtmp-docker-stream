@@ -60,6 +60,13 @@ success "Docker $(docker --version | awk '{print $3}' | tr -d ',')"
 if [[ -f .env ]]; then
   warn ".env already exists — leaving it as-is. Delete it first if you want fresh secrets."
 else
+  # Confirm before generating secrets
+  read -p "Generate fresh secrets and create .env? (y/n) " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    die "Installation aborted."
+  fi
+
   cp .env.example .env
   # Real random secrets, not the empty placeholders from .env.example —
   # openssl is present on every platform this script targets (macOS ships

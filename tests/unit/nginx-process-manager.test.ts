@@ -230,7 +230,7 @@ describe("NginxProcessManager — crash handling", () => {
     h.eventBus.on("nginx.crashed", (p) => crashes.push(p));
 
     await h.manager.init();
-    h.manager.stop();
+    h.manager.dispose();
     h.spawned[0]?.emit("exit", 0, null);
     await flush();
 
