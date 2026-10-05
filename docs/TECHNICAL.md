@@ -337,11 +337,11 @@ No source code exists yet, so this is a plan to build test coverage against, not
 
 ### Security suite
 
-Modeled directly on Stagebox's own three-pronged setup (`docs/CI_CD.md §2.3` there), not invented from scratch — same shape, rules grounded in *this* project's actual invariants rather than copied generically.
+Three-pronged setup: spec sync verification, SAST (Semgrep, custom invariants), secret scanning (gitleaks).
 
 **1. Secret scan (gitleaks, full history, blocking).** Already covered above: it's the last line of defense, not the plan — the structural defense (secrets in Mongo, `.env` gitignored, no real third-party keys in CI) is what actually matters. Runs both as a local pre-commit hook (so a secret never leaves the machine) and as the first CI job on every PR/push.
 
-**2. SAST (Semgrep, custom rules for this project's own invariants).** `.semgrep/security.yml` exists and is real — validated with `docker run semgrep/semgrep` (no network access to PyPI in this environment, Docker was the working path), both that it parses (an early draft didn't — an unquoted pattern containing a colon broke the YAML, fixed) and that it actually fires: a throwaway file with every violation type deliberately introduced was caught by all four rules before this was trusted. Generic OWASP scanning is noise for a codebase this small and specific; the value is in encoding the exact mistakes this design has already identified as dangerous. Same severity split as Stagebox's (`ERROR` blocks the PR, `WARNING` is advisory-only):
+**2. SAST (Semgrep, custom rules for this project's own invariants).** `.semgrep/security.yml` exists and is real — validated with `docker run semgrep/semgrep` (no network access to PyPI in this environment, Docker was the working path), both that it parses (an early draft didn't — an unquoted pattern containing a colon broke the YAML, fixed) and that it actually fires: a throwaway file with every violation type deliberately introduced was caught by all four rules before this was trusted. Generic OWASP scanning is noise for a codebase this small and specific; the value is in encoding the exact mistakes this design has already identified as dangerous. Two severity levels: `ERROR` blocks the PR, `WARNING` is advisory-only.
 
 | id | severity | catches |
 |---|---|---|
@@ -361,7 +361,7 @@ Modeled directly on Stagebox's own three-pronged setup (`docs/CI_CD.md §2.3` th
 feature/<name> ──PR──▶ staging ──PR──▶ main
 ```
 
-Two tiers, not Stagebox's three (`feature → deployable → staging → main`) — there's only one deployable here, so the middle tier doesn't exist. `staging` is still the integration branch and is expected to stay green; `main` receives only deliberate merges from it, same spirit as Stagebox even though the branch count differs.
+Two tiers: `staging` (integration branch, expected to stay green), `main` (only receives deliberate merges from staging).
 
 > Note: an earlier version of this doc argued explicitly *against* a staging tier ("no intermediate staging tier, since there's only one thing here to integrate") — reversed. A single deployable was never really the reason to skip it; `staging` earns its place as the place PRs land and CI runs before anything reaches `main`, independent of how many deployables there are.
 
@@ -373,11 +373,11 @@ Two tiers, not Stagebox's three (`feature → deployable → staging → main`) 
 2. **Spec sync** (`ci.yml`) — `bun scripts/check-spec-sync.ts`. Zero dependencies: diffs `openapi.yaml`'s paths against this doc's own HTTP payload table, with an explicit allowlist for the known, intentional asymmetries (static HTML pages aren't in `openapi.yaml`; the internal nginx-notify routes aren't in this table). Verified by deliberately breaking it once before trusting it.
 3. **Lint** — Biome (`bunx @biomejs/biome check src/ scripts/ tests/`).
 4. **Typecheck** — `bunx tsc --noEmit`.
-5. **Unit tests** — `bun test tests/unit/` — no external services, matches Stagebox's `tests/unit/`/`tests/integration/` split exactly.
+5. **Unit tests** — `bun test tests/unit/` — no external services.
 6. **Integration tests** — `bun test tests/integration/`, against a real Mongo *service container* in the CI job (not a manually-started local one) — the actual heartbeat-event connection tracking, the fixed-`_id` upsert behavior, the per-destination event emission, all proven in CI the same way they were proven locally.
 7. **Compile** — `bun build ./src/index.ts --compile --outfile dist/sidecar`.
 
-**Both workflows trigger on PRs and on push to `staging`/`main`/`feature/**`** — "the same checks run again on staging → main" is real, not just documented, since both workflow files list all three branches as triggers. No separate Main CI shape, unlike Stagebox's, since there's no docs-only fast path worth speeding up here.
+**Both workflows trigger on PRs and on push to `staging`/`main`/`feature/**`** — "the same checks run again on staging → main" is real, not just documented, since both workflow files list all three branches as triggers.
 
 **Still not real, deliberately, not by oversight:**
 
@@ -541,7 +541,7 @@ Three singletons, three owners, one write path each (its own events), no cross-w
 - **Idle threshold.** How many consecutive no-growth `StreamStatUpdated` ticks (and at what tick interval) should count as `StreamIdle` — too sensitive and a brief encoder hiccup falsely flags idle; too lax and a real stall takes too long to surface. This is a product/tuning decision, not something to hardcode a guessed number for here. The UI design brief now assumes roughly a 1s stat-update cadence on the dashboard — worth treating as an informing constraint on `StreamStatsSession`'s actual interval, not a coincidence to ignore, but still not a decision made here.
 - **Bootstrap-registration race.** Two near-simultaneous unauthenticated `POST /auth/register` calls against an empty `users` collection could both pass an `isEmpty()` check before either write lands, producing two unauthenticated admin accounts instead of one. Low real-world likelihood for a single-operator tool deployed once, but the fix (a unique index that only one insert can satisfy, or a Mongo transaction) is cheap enough that it shouldn't just be assumed away.
 - **User management beyond creation.** Registration covers creating accounts; nothing here covers listing, disabling, or changing another user's role after the fact. Worth deciding whether that's in scope for v1 or genuinely later.
-- ~~Whether to write an `openapi.yaml`~~ — resolved: yes, it exists at the repo root, second source of truth to this doc. The project-specific Spectral rule (security-block-required, matching Stagebox's own pattern) is the remaining piece — not written yet.
+- ~~Whether to write an `openapi.yaml`~~ — resolved: yes, it exists at the repo root, second source of truth to this doc. Spectral rules for API security validation pending.
 - **Ingest-key rotation.** Explicitly out of scope for v1 (see Explicitly not doing), but a real operational need eventually — if the ingest key leaks, there's currently no UI path to generate a new one without going around the API by hand.
 - **`ENCRYPTION_KEY` rotation.** Not handled — changing it makes every previously-encrypted destination stream key undecryptable (a `GET /profile` for an affected account would start throwing instead of returning stale data, which is at least loud rather than silently wrong, but still not a real answer). A real fix needs either a decrypt-with-old/re-encrypt-with-new migration path or versioned keys (an id alongside each ciphertext saying which key encrypted it); neither is built.
 - **What `/health` should report while nginx is deliberately not running yet** (fresh install, no destination config set). `nginxReachable: false` is technically true but reads like a failure when it's actually the expected pre-setup state — worth a distinct status value (or at least a clear `reason` field) rather than making "not configured yet" look identical to "something's broken."
