@@ -116,8 +116,12 @@ export class HttpApi {
     );
   }
 
-  stop(): void {
-    this.#server?.stop();
+  // dispose() — gracefully stop the HTTP server. Closes the listening socket
+  // and allows in-flight requests to finish. Safe to call multiple times
+  // (idempotent). Called during shutdown (SIGTERM handler).
+  dispose(): void {
+    if (!this.#server) return;
+    this.#server.stop();
   }
 
   async #handle(req: Request, server: ReturnType<typeof Bun.serve>): Promise<Response> {

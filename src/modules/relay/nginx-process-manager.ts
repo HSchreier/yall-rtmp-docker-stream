@@ -121,7 +121,12 @@ export class NginxProcessManager {
     }
   }
 
-  stop(): void {
+  // dispose() — gracefully stop the nginx process by sending SIGTERM to the
+  // master process. nginx's standard handler for SIGTERM is to stop accepting
+  // new connections and wait for in-flight connections to close. Safe to call
+  // multiple times (idempotent — if nginx isn't running, returns immediately).
+  // Called during shutdown (SIGTERM handler in bootstrap).
+  dispose(): void {
     if (!this.#child) return;
     this.#stopping = true;
     this.#child.kill("SIGTERM");

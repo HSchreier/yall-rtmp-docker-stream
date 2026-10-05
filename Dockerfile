@@ -111,6 +111,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=nginx-build /usr/local/nginx /usr/local/nginx
 COPY --from=sidecar-build /app/sidecar /app/sidecar
 COPY docker/nginx.conf.template /app/docker/nginx.conf.template
+COPY docker/server.sh /app/server.sh
+
+RUN chmod +x /app/server.sh
+
+# Security: Create non-root user for sidecar (principle of least privilege)
+# Also pre-create .logs directory so non-root user can write to it
+RUN groupadd -r sidecar && useradd -r -g sidecar sidecar && \
+    mkdir -p /app/.logs && \
+    chown -R sidecar:sidecar /app
 
 ENV PATH="/usr/local/nginx/sbin:${PATH}"
 ENV HTTP_PORT=8080
@@ -125,10 +134,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 WORKDIR /app
 
-# nginx is NOT started here, and won't be until NginxProcessManager exists
-# (docs/TECHNICAL.md §RTMP relay, Build order step 4) — the sidecar itself
-# will spawn and supervise it as a child process once that module is
-# built. Running just the sidecar now is the correct incremental state,
-# not a placeholder to come back and fix: see docker-compose.yml's own
-# comment for the same reasoning on the (not yet added) relay service.
-CMD ["/app/sidecar"]
+# Drop to non-root user for security
+USER sidecar
+
+CMD ["/app/server.sh"]

@@ -1,0 +1,15 @@
+title = "Gitleaks Configuration"
+description = "Allowlist for this repo"
+
+[extend]
+useDefault = true
+
+[allowlist]
+paths = [
+  "README.md",
+  "openapi.yaml",
+  "TECHNICAL.md",
+  ".semgrep/security.yml",
+  ".env.example",
+  "docker-compose.yml"
+]

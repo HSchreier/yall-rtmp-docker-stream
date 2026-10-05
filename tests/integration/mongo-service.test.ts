@@ -17,7 +17,7 @@ describe("MongoService (integration — requires live Mongo)", () => {
   });
 
   afterAll(async () => {
-    await service.close();
+    await service.dispose();
   });
 
   test("isConnected() becomes true after init(), driven by real heartbeat events", async () => {
