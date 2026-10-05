@@ -47,6 +47,8 @@ function toDoc(row: UserRow): UserDoc {
     role: row.role,
     createdAt: row.createdAt,
     registeredBy: row.registeredBy,
+    streamKey: row.streamKey,
+    streamKeyExpiry: row.streamKeyExpiry,
   };
 }
 

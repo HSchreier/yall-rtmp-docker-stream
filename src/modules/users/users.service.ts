@@ -273,7 +273,7 @@ export class UsersService {
 
     this.eventBus.emit("UserUpdated", {
       userId,
-      changedFields: ["streamKey"],
+      changedFields: ["email"],
       updatedBy: regeneratedBy,
       at: new Date(),
     });
