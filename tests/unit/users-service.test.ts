@@ -28,13 +28,16 @@ function asUser(userId: string): JwtPayload {
 }
 
 function makeUserDoc(overrides: Partial<UserDoc>): UserDoc {
+  const now = new Date();
   return {
     userId: "u1",
     email: "a@example.com",
     passwordHash: "hash",
     role: "user",
-    createdAt: new Date(),
+    createdAt: now,
     registeredBy: "admin-0",
+    streamKey: "test-key-32-chars-padding-here",
+    streamKeyExpiry: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000),
     ...overrides,
   };
 }

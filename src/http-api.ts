@@ -34,22 +34,26 @@ import { tryAuth } from "./infra/http-session.ts";
 import type { Logger } from "./infra/logger.ts";
 import type { AuthService } from "./modules/auth/auth.service.ts";
 import type { UserRepository } from "./modules/users/users.repository.ts";
-import appCss from "./static/app.css" with { type: "text" };
-import appJs from "./static/app.js" with { type: "text" };
 // Cast to string: bun-types claims *.html for its own unrelated HTMLBundle
 // dev-server feature, so tsc sees these as HTMLBundle even though Bun's
 // bundler actually resolves them as plain text at both dev and compile
 // time per the `type: "text"` attribute — see text-assets.d.ts.
+import adminDashboardHtmlRaw from "./static/admin-dashboard.html" with { type: "text" };
+import appCss from "./static/app.css" with { type: "text" };
+import appJs from "./static/app.js" with { type: "text" };
 import dashboardHtmlRaw from "./static/dashboard.html" with { type: "text" };
 import loginHtmlRaw from "./static/login.html" with { type: "text" };
 import settingsHtmlRaw from "./static/settings.html" with { type: "text" };
 import setupHtmlRaw from "./static/setup.html" with { type: "text" };
 import templateJs from "./static/template.js" with { type: "text" };
+import userDashboardHtmlRaw from "./static/user-dashboard.html" with { type: "text" };
 
+const adminDashboardHtml = adminDashboardHtmlRaw as unknown as string;
 const dashboardHtml = dashboardHtmlRaw as unknown as string;
 const loginHtml = loginHtmlRaw as unknown as string;
 const settingsHtml = settingsHtmlRaw as unknown as string;
 const setupHtml = setupHtmlRaw as unknown as string;
+const userDashboardHtml = userDashboardHtmlRaw as unknown as string;
 
 export interface ModuleRouter {
   handle(req: Request, url: URL, clientIp: string | null): Promise<Response | undefined>;
@@ -72,6 +76,8 @@ const STATIC_FILES: Array<{ route: string; body: string; contentType: string }> 
   { route: "/setup.html", body: setupHtml, contentType: "text/html" },
   { route: "/login.html", body: loginHtml, contentType: "text/html" },
   { route: "/dashboard.html", body: dashboardHtml, contentType: "text/html" },
+  { route: "/admin-dashboard.html", body: adminDashboardHtml, contentType: "text/html" },
+  { route: "/user-dashboard.html", body: userDashboardHtml, contentType: "text/html" },
   { route: "/settings.html", body: settingsHtml, contentType: "text/html" },
   { route: "/app.js", body: appJs, contentType: "application/javascript" },
   { route: "/template.js", body: templateJs, contentType: "application/javascript" },
