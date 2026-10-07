@@ -390,6 +390,61 @@
     .toast.success {
       border-left: 4px solid var(--color-success);
     }
+
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-content h3 {
+      margin: 0 0 16px 0;
+      color: var(--color-text);
+    }
+
+    .field {
+      margin-bottom: 16px;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+      color: var(--color-text);
+      font-weight: 500;
+    }
+
+    .field input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      background: var(--color-bg);
+      color: var(--color-text);
+      font-size: 14px;
+    }
+
+    .field input:focus {
+      outline: none;
+      border-color: var(--color-brand);
+    }
   </style>
 </head>
 <body>
@@ -432,18 +487,18 @@
         <div class="destinations-list" id="destinations-status">
           <div class="destination-item">
             <span class="dest-name">Mixcloud</span>
-            <span class="dest-status"><span class="status-dot"></span> Off</span>
-            <button type="button">Configure</button>
+            <span class="dest-status"><span class="status-dot" id="mixcloud-dot"></span> <span id="mixcloud-status">Not configured</span></span>
+            <button type="button" id="configure-mixcloud-btn">Configure</button>
           </div>
           <div class="destination-item">
             <span class="dest-name">YouTube</span>
-            <span class="dest-status"><span class="status-dot"></span> Off</span>
-            <button type="button">Configure</button>
+            <span class="dest-status"><span class="status-dot" id="youtube-dot"></span> <span id="youtube-status">Not configured</span></span>
+            <button type="button" id="configure-youtube-btn">Configure</button>
           </div>
           <div class="destination-item">
             <span class="dest-name">Twitch</span>
-            <span class="dest-status"><span class="status-dot"></span> Off</span>
-            <button type="button">Configure</button>
+            <span class="dest-status"><span class="status-dot" id="twitch-dot"></span> <span id="twitch-status">Not configured</span></span>
+            <button type="button" id="configure-twitch-btn">Configure</button>
           </div>
         </div>
       </div>
@@ -503,6 +558,27 @@
   <!-- Toast Notification -->
   <div id="toast" class="toast"></div>
 
+  <!-- Destination Configuration Modal -->
+  <div id="dest-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h3 id="dest-modal-title">Configure Destination</h3>
+      <form id="dest-form">
+        <div class="field">
+          <label for="dest-key-input">API Key / Stream Key</label>
+          <input type="text" id="dest-key-input" placeholder="Paste your API key here" required />
+        </div>
+        <div class="field">
+          <label for="dest-custom-url">Custom Ingest URL (optional)</label>
+          <input type="text" id="dest-custom-url" placeholder="Leave blank for default" />
+        </div>
+        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px;">
+          <button type="button" class="secondary" id="dest-cancel-btn">Cancel</button>
+          <button type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     const API_BASE = location.origin;
     const authToken = localStorage.getItem('authToken');
@@ -528,11 +604,89 @@
     document.getElementById('delete-account-btn').addEventListener('click', deleteAccount);
     document.getElementById('stop-btn').addEventListener('click', stopStreaming);
 
+    // Destination configuration
+    document.getElementById('configure-mixcloud-btn').addEventListener('click', () => openDestinationModal('mixcloud'));
+    document.getElementById('configure-youtube-btn').addEventListener('click', () => openDestinationModal('youtube'));
+    document.getElementById('configure-twitch-btn').addEventListener('click', () => openDestinationModal('twitch'));
+    document.getElementById('dest-cancel-btn').addEventListener('click', closeDestinationModal);
+    document.getElementById('dest-form').addEventListener('submit', saveDestination);
+
     // Load initial data
     loadUserProfile();
     loadStreamKey();
+    loadDestinationProfile();
     loadActivityLog();
     simulateStreaming(); // Temporary for demo
+
+    let currentDestination = null;
+
+    async function openDestinationModal(destination) {
+      currentDestination = destination;
+      const modal = document.getElementById('dest-modal');
+      const title = document.getElementById('dest-modal-title');
+      title.textContent = `Configure ${destination.charAt(0).toUpperCase() + destination.slice(1)}`;
+      document.getElementById('dest-form').reset();
+      modal.style.display = 'flex';
+    }
+
+    function closeDestinationModal() {
+      document.getElementById('dest-modal').style.display = 'none';
+      currentDestination = null;
+    }
+
+    async function saveDestination(event) {
+      event.preventDefault();
+      if (!currentDestination) return;
+
+      const streamKey = document.getElementById('dest-key-input').value.trim();
+      const customIngestUrl = document.getElementById('dest-custom-url').value.trim() || undefined;
+
+      if (!streamKey) {
+        showToast('API key cannot be empty', 'error');
+        return;
+      }
+
+      const payload = {
+        [currentDestination]: {
+          enabled: true,
+          streamKey,
+          customIngestUrl,
+        },
+      };
+
+      const data = await apiCall('PUT', '/profile', payload);
+      if (data) {
+        updateDestinationStatus(currentDestination, true);
+        showToast(`${currentDestination} configured successfully`, 'success');
+        closeDestinationModal();
+      } else {
+        showToast('Failed to save destination', 'error');
+      }
+    }
+
+    async function loadDestinationProfile() {
+      const data = await apiCall('GET', '/profile');
+      if (data) {
+        ['mixcloud', 'youtube', 'twitch'].forEach(dest => {
+          const config = data[dest];
+          if (config?.enabled && config?.streamKey) {
+            updateDestinationStatus(dest, true);
+          }
+        });
+      }
+    }
+
+    function updateDestinationStatus(destination, enabled) {
+      const dot = document.getElementById(`${destination}-dot`);
+      const status = document.getElementById(`${destination}-status`);
+      if (enabled) {
+        dot.style.backgroundColor = 'var(--color-success)';
+        status.textContent = 'Configured';
+      } else {
+        dot.style.backgroundColor = '#666';
+        status.textContent = 'Not configured';
+      }
+    }
 
     async function apiCall(method, path, body = null) {
       const options = {
