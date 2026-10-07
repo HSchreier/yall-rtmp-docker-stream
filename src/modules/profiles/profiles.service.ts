@@ -4,6 +4,7 @@
 // own yet), kept here rather than skipped so the router only ever talks to
 // services, never reaches into a repository directly.
 
+import { ValidationError } from "../../infra/errors.ts";
 import type { RelayStateRepository } from "../relay/relay.repository.ts";
 import type {
   DestinationProfileDoc,
@@ -26,6 +27,18 @@ export class ProfileService {
     update: DestinationProfileUpdate,
     updatedBy: string,
   ): Promise<DestinationProfileDoc> {
+    // Validate destination credentials
+    for (const dest of ["mixcloud", "youtube", "twitch"] as const) {
+      const entry = update[dest];
+      if (entry?.streamKey !== undefined) {
+        if (!entry.streamKey || entry.streamKey.trim().length === 0) {
+          throw new ValidationError(`${dest} API key cannot be empty.`);
+        }
+        if (entry.streamKey.length > 1000) {
+          throw new ValidationError(`${dest} API key is too long (max 1000 characters).`);
+        }
+      }
+    }
     return this.profiles.upsert(userId, update, updatedBy);
   }
 
