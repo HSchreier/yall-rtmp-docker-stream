@@ -13,7 +13,7 @@ export class ProfilesRouter {
     private readonly auth: AuthService,
   ) {}
 
-  async handle(req: Request, url: URL): Promise<Response | undefined> {
+  async handle(req: Request, url: URL, clientIp: string | null): Promise<Response | undefined> {
     const { pathname } = url;
 
     if (pathname === "/profile" && req.method === "GET") {

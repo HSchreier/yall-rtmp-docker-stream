@@ -5,7 +5,7 @@ import type { WaspFilter, WaspRule } from "../../infra/wasp-filter";
 export class SettingsRouter implements ModuleRouter {
   constructor(private wasp: WaspFilter) {}
 
-  async handle(req: Request, url: URL): Promise<Response | undefined> {
+  async handle(req: Request, url: URL, clientIp: string | null): Promise<Response | undefined> {
     const pathname = url.pathname;
 
     if (req.method === "GET" && pathname === "/settings/security/rules") {

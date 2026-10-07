@@ -20,7 +20,7 @@ export class HealthRouter {
     }
   }
 
-  async handle(req: Request, url: URL): Promise<Response | undefined> {
+  async handle(req: Request, url: URL, clientIp: string | null): Promise<Response | undefined> {
     if (url.pathname === "/health" && req.method === "GET") {
       const nginxReachable = await this.isNginxReachable();
       return jsonResponse(200, {

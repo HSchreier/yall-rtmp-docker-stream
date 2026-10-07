@@ -5,16 +5,19 @@
 import { AuthError } from "../../infra/errors.ts";
 import { jsonResponse, readJson, sessionCookie } from "../../infra/http.ts";
 import { requireAuth, tryAuth } from "../../infra/http-session.ts";
+import { RateLimiter } from "../../infra/rate-limiter.ts";
 import type { UserRepository } from "../users/users.repository.ts";
 import type { AuthService, RegisterInput } from "./auth.service.ts";
 
 export class AuthRouter {
+  readonly #rateLimiter = new RateLimiter({ maxAttempts: 5, windowMs: 15 * 60 * 1000 });
+
   constructor(
     private readonly auth: AuthService,
     private readonly users: UserRepository,
   ) {}
 
-  async handle(req: Request, url: URL): Promise<Response | undefined> {
+  async handle(req: Request, url: URL, clientIp: string | null): Promise<Response | undefined> {
     const { pathname } = url;
 
     if (pathname === "/me" && req.method === "GET") {
@@ -33,7 +36,23 @@ export class AuthRouter {
 
     if (pathname === "/auth/login" && req.method === "POST") {
       const body = await readJson<{ email: string; password: string }>(req);
+
+      // Rate limit: 5 attempts per 15 minutes
+      if (!this.#rateLimiter.check(clientIp, body.email)) {
+        const lockoutMs = this.#rateLimiter.getLockoutTime(clientIp, body.email);
+        const retryAfterSec = lockoutMs ? Math.ceil(lockoutMs / 1000) : 900;
+        const res = jsonResponse(429, {
+          error: {
+            code: "TOO_MANY_REQUESTS",
+            message: "Too many login attempts. Try again later.",
+          },
+        });
+        res.headers.append("Retry-After", String(retryAfterSec));
+        return res;
+      }
+
       const { token } = await this.auth.login(body.email, body.password);
+      this.#rateLimiter.reset(clientIp, body.email);
       const res = jsonResponse(200, { token });
       res.headers.append("Set-Cookie", sessionCookie(token));
       return res;
