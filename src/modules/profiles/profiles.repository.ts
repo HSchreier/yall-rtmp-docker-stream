@@ -26,10 +26,22 @@ import { decryptSecret, encryptSecret } from "../../infra/crypto.ts";
 import type { EventBus } from "../../infra/event-bus.ts";
 import type { Destination } from "../../infra/events.ts";
 
+// DestinationEntry — flexible schema for platform-specific RTMP credentials.
+//
+// YouTube: requires streamKey (RTMPS); optional channelId, ingestServer, customIngestUrl
+// Twitch: requires streamKey; optional serverUrl, channelName, customIngestUrl
+// Mixcloud: requires streamUrl (full RTMP endpoint); optional accessToken, studioId, customIngestUrl
 export interface DestinationEntry {
   enabled: boolean;
-  streamKey?: string;
-  customIngestUrl?: string;
+  streamKey?: string; // YouTube/Twitch: RTMP(S) stream key
+  streamUrl?: string; // Mixcloud: full RTMP endpoint URL
+  channelId?: string; // YouTube: channel ID (reference)
+  channelName?: string; // Twitch: channel name (reference)
+  ingestServer?: string; // YouTube: custom ingest server (default: rtmps://a.rtmp.youtube.com/live2)
+  serverUrl?: string; // Twitch: custom RTMP server URL (default: rtmp://live-iad.twitch.tv/app)
+  customIngestUrl?: string; // Legacy: custom ingest URL (use streamUrl for Mixcloud instead)
+  accessToken?: string; // Mixcloud: API access token (optional)
+  studioId?: string; // Mixcloud: studio ID (reference)
 }
 
 // Ingest-side jitter tolerance, consumed by NginxConfigRenderer alongside

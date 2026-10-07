@@ -27,18 +27,42 @@ export class ProfileService {
     update: DestinationProfileUpdate,
     updatedBy: string,
   ): Promise<DestinationProfileDoc> {
-    // Validate destination credentials
-    for (const dest of ["mixcloud", "youtube", "twitch"] as const) {
-      const entry = update[dest];
-      if (entry?.streamKey !== undefined) {
-        if (!entry.streamKey || entry.streamKey.trim().length === 0) {
-          throw new ValidationError(`${dest} API key cannot be empty.`);
-        }
-        if (entry.streamKey.length > 1000) {
-          throw new ValidationError(`${dest} API key is too long (max 1000 characters).`);
-        }
+    // Validate YouTube credentials
+    if (update.youtube?.enabled) {
+      if (!update.youtube.streamKey?.trim()) {
+        throw new ValidationError("YouTube: Stream key (RTMPS) is required.");
+      }
+      if (update.youtube.streamKey.length > 1000) {
+        throw new ValidationError("YouTube: Stream key is too long (max 1000 chars).");
       }
     }
+
+    // Validate Twitch credentials
+    if (update.twitch?.enabled) {
+      if (!update.twitch.streamKey?.trim()) {
+        throw new ValidationError("Twitch: Stream key is required.");
+      }
+      if (update.twitch.streamKey.length > 1000) {
+        throw new ValidationError("Twitch: Stream key is too long (max 1000 chars).");
+      }
+    }
+
+    // Validate Mixcloud credentials
+    if (update.mixcloud?.enabled) {
+      if (!update.mixcloud.streamUrl?.trim()) {
+        throw new ValidationError("Mixcloud: Stream URL (full RTMP endpoint) is required.");
+      }
+      if (
+        !update.mixcloud.streamUrl.startsWith("rtmp://") &&
+        !update.mixcloud.streamUrl.startsWith("rtmps://")
+      ) {
+        throw new ValidationError("Mixcloud: Stream URL must start with rtmp:// or rtmps://");
+      }
+      if (update.mixcloud.streamUrl.length > 2000) {
+        throw new ValidationError("Mixcloud: Stream URL is too long (max 2000 chars).");
+      }
+    }
+
     return this.profiles.upsert(userId, update, updatedBy);
   }
 
