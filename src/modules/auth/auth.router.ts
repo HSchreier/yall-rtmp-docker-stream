@@ -24,7 +24,13 @@ export class AuthRouter {
       const session = requireAuth(req, this.auth);
       const user = await this.users.findById(session.userId);
       if (!user) throw new AuthError();
-      return jsonResponse(200, { userId: user.userId, email: user.email, role: user.role });
+      return jsonResponse(200, {
+        userId: user.userId,
+        email: user.email,
+        role: user.role,
+        streamKey: user.streamKey,
+        streamKeyExpiry: user.streamKeyExpiry,
+      });
     }
 
     if (pathname === "/auth/register" && req.method === "POST") {
@@ -53,7 +59,9 @@ export class AuthRouter {
 
       const { token } = await this.auth.login(body.email, body.password);
       this.#rateLimiter.reset(clientIp, body.email);
-      const res = jsonResponse(200, { token });
+      const user = await this.users.findByEmail(body.email);
+      if (!user) throw new AuthError();
+      const res = jsonResponse(200, { token, role: user.role });
       res.headers.append("Set-Cookie", sessionCookie(token));
       return res;
     }

@@ -83,16 +83,16 @@ function renderPushLine(
 // production template that happens not to exercise the risk at all.
 export function renderNginxConfig(
   template: string,
-  profile: DestinationProfileDoc,
+  profile: DestinationProfileDoc | null,
   httpPort: number,
 ): string {
-  const preset = BUFFER_PRESETS[profile.bufferProfile];
+  const preset = profile ? BUFFER_PRESETS[profile.bufferProfile] : BUFFER_PRESETS.mobile;
 
   const values: Record<(typeof PLACEHOLDER_NAMES)[number], string> = {
     HTTP_PORT: String(httpPort),
-    MIXCLOUD_PUSH_LINE: renderPushLine("mixcloud", profile.mixcloud),
-    YOUTUBE_PUSH_LINE: renderPushLine("youtube", profile.youtube),
-    TWITCH_PUSH_LINE: renderPushLine("twitch", profile.twitch),
+    MIXCLOUD_PUSH_LINE: profile ? renderPushLine("mixcloud", profile.mixcloud) : "",
+    YOUTUBE_PUSH_LINE: profile ? renderPushLine("youtube", profile.youtube) : "",
+    TWITCH_PUSH_LINE: profile ? renderPushLine("twitch", profile.twitch) : "",
     OUT_QUEUE: String(preset.outQueue),
     OUT_CORK: String(preset.outCork),
     RELAY_BUFFER_MS: String(preset.relayBufferMs),

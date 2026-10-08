@@ -3,9 +3,31 @@
 
 import { jsonResponse } from "../../infra/http.ts";
 import type { MongoService } from "../../infra/mongo-service.ts";
+import { networkInterfaces } from "node:os";
+
+function getLocalIpOrHostname(): string {
+  // Priority 1: explicit env var (for staging/prod override)
+  if (Bun.env.RTMP_RELAY_URL && Bun.env.RTMP_RELAY_URL !== "auto") {
+    return Bun.env.RTMP_RELAY_URL;
+  }
+
+  // Priority 2: host IP env var (set by docker-compose or user)
+  if (Bun.env.RTMP_HOST_IP) {
+    const port = Bun.env.RTMP_PORT || "1935";
+    return `rtmp://${Bun.env.RTMP_HOST_IP}:${port}`;
+  }
+
+  // Priority 3: Docker host.docker.internal (Mac/Windows Docker Desktop)
+  const port = Bun.env.RTMP_PORT || "1935";
+  return `rtmp://host.docker.internal:${port}`;
+}
 
 export class HealthRouter {
-  constructor(private readonly mongo: MongoService) {}
+  readonly #rtmpRelayUrl: string;
+
+  constructor(private readonly mongo: MongoService) {
+    this.#rtmpRelayUrl = getLocalIpOrHostname();
+  }
 
   private async isNginxReachable(): Promise<boolean> {
     try {
@@ -27,6 +49,7 @@ export class HealthRouter {
         ingestStatus: "offline",
         nginxReachable,
         mongoReachable: this.mongo.isConnected(),
+        rtmpRelayUrl: this.#rtmpRelayUrl,
         at: new Date().toISOString(),
       });
     }

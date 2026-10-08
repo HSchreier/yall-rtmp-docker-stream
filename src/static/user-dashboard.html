@@ -472,7 +472,7 @@
       <div class="panel">
         <h2 class="panel-title">RTMP Endpoint</h2>
         <div class="endpoint-box">
-          <span class="endpoint-text" id="rtmp-endpoint">rtmp://relay.example.com/live/...</span>
+          <span class="endpoint-text" id="rtmp-endpoint">rtmp://relay.local/live/...</span>
           <button type="button" id="copy-endpoint-btn">Copy</button>
           <button type="button" id="show-endpoint-btn">Show</button>
         </div>
@@ -583,10 +583,21 @@
     const API_BASE = location.origin;
     const authToken = localStorage.getItem('authToken');
     const userId = localStorage.getItem('userId');
+    let rtmpRelayUrl = 'rtmp://localhost:1935';
     let streamKeyVisible = false;
     let endpointVisible = false;
     let isStreaming = false;
     let streamStartTime = null;
+
+    async function loadConfig() {
+      try {
+        const res = await fetch(`${API_BASE}/health`);
+        const data = await res.json();
+        rtmpRelayUrl = data.rtmpRelayUrl || 'rtmp://localhost:1935';
+      } catch {
+        // Use default if fetch fails
+      }
+    }
 
     if (!authToken || !userId) {
       window.location.href = '/login.html';
@@ -612,11 +623,14 @@
     document.getElementById('dest-form').addEventListener('submit', saveDestination);
 
     // Load initial data
-    loadUserProfile();
-    loadStreamKey();
-    loadDestinationProfile();
-    loadActivityLog();
-    simulateStreaming(); // Temporary for demo
+    (async () => {
+      await loadConfig();
+      loadUserProfile();
+      loadStreamKey();
+      loadDestinationProfile();
+      loadActivityLog();
+      simulateStreaming(); // Temporary for demo
+    })();
 
     let currentDestination = null;
 
@@ -715,15 +729,16 @@
     }
 
     async function loadStreamKey() {
-      const data = await apiCall('GET', `/users/${userId}/streamkey`);
-      if (data) {
+      const data = await apiCall('GET', '/users/me');
+      if (data?.streamKey) {
         const key = data.streamKey;
         document.getElementById('streamkey-display').textContent = '•'.repeat(32);
         document.getElementById('streamkey-display').dataset.key = key;
-        const expiry = Math.floor((new Date(data.expiresAt) - Date.now()) / (24 * 60 * 60 * 1000));
+        const expiry = Math.floor((new Date(data.streamKeyExpiry) - Date.now()) / (24 * 60 * 60 * 1000));
         document.getElementById('key-expiry').textContent = expiry;
-        document.getElementById('rtmp-endpoint').textContent = `rtmp://relay.example.com/live/${key}`;
-        document.getElementById('rtmp-endpoint').dataset.endpoint = `rtmp://relay.example.com/live/${key}`;
+        const endpoint = `${rtmpRelayUrl}/live/${key}`;
+        document.getElementById('rtmp-endpoint').textContent = endpoint;
+        document.getElementById('rtmp-endpoint').dataset.endpoint = endpoint;
       }
     }
 
@@ -776,10 +791,10 @@
       endpointVisible = !endpointVisible;
       const el = document.getElementById('rtmp-endpoint');
       if (endpointVisible) {
-        el.textContent = el.dataset.endpoint || 'rtmp://relay.example.com/live/...';
+        el.textContent = el.dataset.endpoint || `${rtmpRelayUrl}/live/...`;
         document.getElementById('show-endpoint-btn').textContent = 'Hide';
       } else {
-        el.textContent = 'rtmp://relay.example.com/live/•••••••••••••••••';
+        el.textContent = `${rtmpRelayUrl}/live/•••••••••••••••••`;
         document.getElementById('show-endpoint-btn').textContent = 'Show';
       }
     }
@@ -798,7 +813,7 @@
 
     function copyEndpoint() {
       const el = document.getElementById('rtmp-endpoint');
-      navigator.clipboard.writeText(el.dataset.endpoint || 'rtmp://relay.example.com/live/...');
+      navigator.clipboard.writeText(el.dataset.endpoint || `${rtmpRelayUrl}/live/...`);
       showToast('Endpoint copied to clipboard', 'success');
     }
 
@@ -809,11 +824,11 @@
     }
 
     function openRegenerateModal() {
-      document.getElementById('regenerate-modal').classList.add('active');
+      document.getElementById('regenerate-modal').style.display = 'flex';
     }
 
     function closeRegenerateModal() {
-      document.getElementById('regenerate-modal').classList.remove('active');
+      document.getElementById('regenerate-modal').style.display = 'none';
     }
 
     async function confirmRegenerate() {

@@ -37,6 +37,11 @@ export interface UserListEntry {
   isActive: boolean;
 }
 
+export interface UserCreated extends UserListEntry {
+  streamKey: string;
+  streamKeyExpiry: Date;
+}
+
 export interface UserPatch {
   email?: string;
   role?: Role;
@@ -51,7 +56,7 @@ export class UsersService {
     private readonly eventBus: EventBus,
   ) {}
 
-  async getSelf(userId: string): Promise<UserListEntry> {
+  async getSelf(userId: string): Promise<UserCreated> {
     const user = await this.users.findById(userId);
     if (!user) throw new NotFoundError("User not found.");
 
@@ -66,13 +71,15 @@ export class UsersService {
       role: user.role,
       hasProfile,
       isActive: user.userId === activeUserId,
+      streamKey: user.streamKey,
+      streamKeyExpiry: user.streamKeyExpiry,
     };
   }
 
   async createUser(
     input: { email: string; password: string; role?: string },
     createdBy: string,
-  ): Promise<UserListEntry> {
+  ): Promise<UserCreated> {
     if (!EMAIL_RE.test(input.email)) {
       throw new ValidationError("Enter a valid email address.");
     }
@@ -113,6 +120,8 @@ export class UsersService {
       role: user.role,
       hasProfile,
       isActive: user.userId === activeUserId,
+      streamKey: user.streamKey,
+      streamKeyExpiry: user.streamKeyExpiry,
     };
   }
 

@@ -106,10 +106,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates \
       gettext-base \
       curl \
+      unzip \
     && rm -rf /var/lib/apt/lists/*
 
+# Install bun for runtime in /usr/local/bin (accessible to non-root user)
+RUN curl -fsSL https://bun.sh/install | bash && \
+    cp /root/.bun/bin/bun /usr/local/bin/bun && \
+    chmod +x /usr/local/bin/bun
+
 COPY --from=nginx-build /usr/local/nginx /usr/local/nginx
-COPY --from=sidecar-build /app/sidecar /app/sidecar
+# COPY --from=sidecar-build /app/sidecar /app/sidecar  # Skip binary for now, use bun run for error visibility
+COPY --from=sidecar-build /app/src /app/src
+COPY --from=sidecar-build /app/package.json /app/bun.lock /app/
+COPY --from=sidecar-build /app/node_modules /app/node_modules
 COPY docker/nginx.conf.template /app/docker/nginx.conf.template
 COPY docker/server.sh /app/server.sh
 

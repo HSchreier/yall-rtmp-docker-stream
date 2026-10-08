@@ -135,6 +135,11 @@ check_ports() {
   return 0
 }
 
+check_rtmp_host() {
+  log_info "NETWORK" "RTMP host IP: ${RTMP_HOST_IP:-not set (will use fallback)}"
+  return 0
+}
+
 # Capture uncaught errors from Bun
 handle_bun_error() {
   local exit_code=$?
@@ -191,6 +196,9 @@ main() {
   check_ports || exit 1
   log_info "STARTUP" "✓ Port availability"
 
+  check_rtmp_host || exit 1
+  log_info "STARTUP" "✓ RTMP host configuration"
+
   log_info "STARTUP" "All pre-flight checks passed ✓"
 
   # Start the sidecar (compiled binary or via bun)
@@ -199,15 +207,16 @@ main() {
   cd "$PROJECT_ROOT"
 
   # Detect if running compiled binary (Docker) or development mode
+  # Prefer bun for better error messages during development
   local sidecar_cmd
-  if [ -x "/app/sidecar" ]; then
-    sidecar_cmd="/app/sidecar"
-    log_info "STARTUP" "Using compiled binary: /app/sidecar"
-  elif command -v bun &> /dev/null; then
+  if command -v bun &> /dev/null; then
     sidecar_cmd="bun run src/index.ts"
     log_info "STARTUP" "Using Bun runtime: bun run src/index.ts"
+  elif [ -x "/app/sidecar" ]; then
+    sidecar_cmd="/app/sidecar"
+    log_info "STARTUP" "Using compiled binary: /app/sidecar"
   else
-    log_error "STARTUP" "Neither compiled binary (/app/sidecar) nor Bun found"
+    log_error "STARTUP" "Neither Bun nor compiled binary (/app/sidecar) found"
     exit 1
   fi
 
