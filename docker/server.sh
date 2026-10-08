@@ -228,12 +228,9 @@ main() {
     exit 1
   fi
 
-  # Run sidecar with both stdout and stderr captured
-  if [ "$verbose" = true ]; then
-    $sidecar_cmd 2>&1 | tee -a "$LOG_DIR/sidecar.log" || handle_bun_error
-  else
-    $sidecar_cmd >> "$LOG_DIR/sidecar.log" 2>&1 || handle_bun_error
-  fi
+  # Run sidecar with both stdout and stderr captured to file AND to Docker logs
+  # Uses tee to split output: to the log file AND to stderr (which Docker captures)
+  $sidecar_cmd 2>&1 | tee -a "$LOG_DIR/sidecar.log" || handle_bun_error
 }
 
 # Trap errors

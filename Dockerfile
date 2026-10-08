@@ -119,7 +119,9 @@ COPY --from=nginx-build /usr/local/nginx /usr/local/nginx
 COPY --from=sidecar-build /app/src /app/src
 COPY --from=sidecar-build /app/package.json /app/bun.lock /app/
 COPY --from=sidecar-build /app/node_modules /app/node_modules
+COPY assets /app/assets
 COPY docker/nginx.conf.template /app/docker/nginx.conf.template
+COPY docker/wasp-rules.json /app/docker/wasp-rules.json
 COPY docker/server.sh /app/server.sh
 
 RUN chmod +x /app/server.sh
