@@ -70,6 +70,16 @@ bun run dev
 
 Open **http://localhost:8080** — first visit walks you through creating the administrator account. No separate seed step, no CLI command to remember.
 
+## Cloud Deployment (Production)
+
+Want to run this on a real server? **See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)** for:
+- **Cloud provider comparison** — Hetzner ($4.50/mo), DigitalOcean ($12/mo), AWS (variable)
+- **Step-by-step setup** — Hetzner, DigitalOcean, and AWS
+- **Cost breakdown** — what you'll actually pay
+- **Production hardening** — firewall, SSL/TLS, monitoring
+
+**TL;DR:** Cheapest option is **Hetzner CPX11** at $4.50/month. Takes ~10 minutes to deploy.
+
 ## Manual setup (if you'd rather not run the script)
 
 ```bash
@@ -271,6 +281,7 @@ Read in this order before touching code:
 
 ### Additional references
 
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — cloud deployment guide with cost-efficient provider recommendations (Hetzner, DigitalOcean, AWS) and step-by-step setup instructions
 - [`docs/SHUTDOWN.md`](docs/SHUTDOWN.md) — graceful shutdown reference, module dispose methods, Docker timeout behavior, testing procedures
 - [`docs/STEP8-INFRASTRUCTURE.md`](docs/STEP8-INFRASTRUCTURE.md) — build order step 8: bootstrap script, pre-flight validation, shutdown infrastructure implementation summary
 
