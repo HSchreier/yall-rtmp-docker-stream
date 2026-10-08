@@ -6,10 +6,10 @@
 // `secret-like-field-in-event-payload` Semgrep rule guards against for
 // events exists identically in error contexts.
 //
-// No pretty-print transport: transports run pino's worker-thread mechanism,
-// which resolves a script by file path — that's a real open question under
-// `bun build --compile` (a compiled binary has no on-disk file tree to
-// resolve against), so this stays plain JSON-to-stdout until that's verified.
+// DEBUG mode (DEBUG=1 env var): pretty-print via pino-pretty transport for
+// development visibility. When compiled binary is used (production), transports
+// can't resolve file paths, so we fall back to JSON. In development, server.sh
+// prefers `bun run src/index.ts` which supports transports correctly.
 
 import pino from "pino";
 
@@ -24,10 +24,31 @@ const REDACT_PATHS = [
   "*.jwtSecret",
 ];
 
+const DEBUG = process.env.DEBUG === "1" || process.env.DEBUG === "true";
+const LOG_LEVEL = process.env.LOG_LEVEL || (DEBUG ? "debug" : "info");
+
 export class Logger {
-  readonly #pino = pino({
-    redact: { paths: REDACT_PATHS, remove: true },
-  });
+  readonly #pino = pino(
+    {
+      level: LOG_LEVEL,
+      redact: { paths: REDACT_PATHS, remove: true },
+    },
+    DEBUG
+      ? pino.transport({
+          target: "pino-pretty",
+          options: {
+            colorize: true,
+            singleLine: false,
+            translateTime: "SYS:standard",
+            ignore: "pid,hostname",
+          },
+        })
+      : undefined,
+  );
+
+  debug(context: Record<string, unknown>, message: string): void {
+    this.#pino.debug(context, message);
+  }
 
   info(context: Record<string, unknown>, message: string): void {
     this.#pino.info(context, message);

@@ -206,6 +206,14 @@ main() {
 
   cd "$PROJECT_ROOT"
 
+  # Export DEBUG mode if set (controls Pino logger formatting)
+  if [ "${DEBUG:-}" = "1" ] || [ "${DEBUG:-}" = "true" ]; then
+    export DEBUG=1
+    log_info "STARTUP" "DEBUG mode enabled (structured logging with pretty-print)"
+  else
+    log_info "STARTUP" "DEBUG mode disabled (JSON output only)"
+  fi
+
   # Detect if running compiled binary (Docker) or development mode
   # Prefer bun for better error messages during development
   local sidecar_cmd

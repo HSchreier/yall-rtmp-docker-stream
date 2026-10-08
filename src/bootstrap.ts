@@ -59,6 +59,10 @@ export interface App {
 export async function bootstrap(): Promise<App> {
   // Step 0: Logger first — everything after this has somewhere to log to.
   const logger = new Logger();
+  logger.info(
+    { pid: process.pid, nodeVersion: process.version },
+    "sidecar bootstrap starting",
+  );
 
   // Step 0, continued: the process-level safety net, registered before any
   // other init() runs. Something reaching this point escaped every other
@@ -81,22 +85,39 @@ export async function bootstrap(): Promise<App> {
   // or anything else is touched.
   const eventBus = new EventBus(logger);
   const config = new ConfigService(logger);
+  logger.debug({}, "ConfigService: bootstrapping env vars");
   config.init();
+  logger.debug(
+    {
+      httpPort: config.get().httpPort,
+      mongoUriHost: config.get().mongoUri.split("@")[1]?.split("/")[0] || "unknown",
+    },
+    "ConfigService: init complete",
+  );
 
   // Step 2: MongoService connects, then the repositories that depend on its
   // Db handle can be constructed and get their own indexes in place.
   const mongo = new MongoService(logger, config.get().mongoUri);
+  logger.debug({}, "MongoService: connecting");
   await mongo.init();
+  logger.debug({}, "MongoService: connected and initialized");
 
   const users = new UserRepository(mongo.db());
+  logger.debug({}, "UserRepository: initializing");
   await users.init();
+  logger.debug({}, "UserRepository: init complete");
+
   const destinationProfiles = new DestinationProfileRepository(
     mongo.db(),
     eventBus,
     config.get().encryptionKey,
   );
+  logger.debug({}, "DestinationProfileRepository: initializing");
   await destinationProfiles.init();
+  logger.debug({}, "DestinationProfileRepository: init complete");
+
   const relayState = new RelayStateRepository(mongo.db(), eventBus);
+  logger.debug({}, "RelayStateRepository: constructed");
 
   // Step 3: AuthService has no init() — stateless, no side effects beyond
   // per-call behavior.
@@ -108,6 +129,7 @@ export async function bootstrap(): Promise<App> {
   // Ahead of the service objects below since nothing there depends on it
   // and docs/TECHNICAL.md's own numbered init order puts it here, right
   // after MongoService-dependent state exists.
+  logger.debug({}, "NginxProcessManager: initializing");
   const nginxProcessManager = new NginxProcessManager({
     logger,
     eventBus,
@@ -116,15 +138,22 @@ export async function bootstrap(): Promise<App> {
     httpPort: config.get().httpPort,
   });
   await nginxProcessManager.init();
+  logger.debug(
+    { running: nginxProcessManager.isRunning() },
+    "NginxProcessManager: init complete",
+  );
 
   // Step 4b: StreamState — domain singleton tracking broadcast status,
   // driven by EventBus subscriptions to stream lifecycle events. Also
   // StreamOrchestrator, the broadcast lifecycle manager, constructed with
   // injected submodule factories for stats/idle detection. Both init()
   // in dependency order per docs/TECHNICAL.md.
+  logger.debug({}, "StreamState: initializing");
   const streamState = new StreamState(eventBus);
   await streamState.init();
+  logger.debug({}, "StreamState: init complete");
 
+  logger.debug({}, "StreamOrchestrator: initializing");
   const statsSessionFactory = (eb: typeof eventBus, log: typeof logger, key: string) =>
     new StreamStatsSession(eb, log, key);
   const idleDetectorFactory = (eb: typeof eventBus, log: typeof logger, key: string) =>
@@ -134,19 +163,24 @@ export async function bootstrap(): Promise<App> {
     idleDetectorFactory,
   ]);
   await streamOrchestrator.init();
+  logger.debug({}, "StreamOrchestrator: init complete");
 
   // Step 5: the service objects that orchestrate across more than one
   // repository — UsersService (list-with-status, admin activation) and
   // ProfileService (own-profile activation). Routers below talk only to
   // these, never to a repository directly.
+  logger.debug({}, "UsersService: constructing");
   const usersService = new UsersService(users, destinationProfiles, relayState, eventBus);
+  logger.debug({}, "ProfileService: constructing");
   const profileService = new ProfileService(destinationProfiles, relayState);
+  logger.debug({}, "IngestEventReceiver: constructing");
   const ingestEventReceiver = new IngestEventReceiver(destinationProfiles, relayState, eventBus);
 
   // Step 5b: WaspFilter — Phase 3 security hardening via iptables-backed
   // request filtering. Loads default rules from docker/wasp-rules.json.
   // Enabled by WASP_ENABLED env var (defaults to false).
   const waspEnabled = process.env.WASP_ENABLED?.toLowerCase() === "true";
+  logger.debug({ waspEnabled }, "WaspFilter: initializing");
   const wasp = new WaspFilter(
     eventBus,
     logger,
@@ -166,8 +200,10 @@ export async function bootstrap(): Promise<App> {
     waspEnabled,
   );
   wasp.init();
+  logger.debug({}, "WaspFilter: init complete");
 
   // Step 6: module routers — each owns its own routes and its own service.
+  logger.debug({}, "Module routers: constructing");
   const routers: ModuleRouter[] = [
     new AuthRouter(auth, users),
     new UsersRouter(usersService, auth),
@@ -177,9 +213,11 @@ export async function bootstrap(): Promise<App> {
     new MetricsRouter(),
     new SettingsRouter(wasp),
   ];
+  logger.debug({ count: routers.length }, "Module routers: constructed");
 
   // Step 7: HttpApi last — binds the listener only once everything it
   // might touch on an incoming request is already up.
+  logger.debug({ port: config.get().httpPort }, "HttpApi: initializing");
   const httpApi = new HttpApi({
     auth,
     users,
@@ -188,6 +226,7 @@ export async function bootstrap(): Promise<App> {
     httpPort: config.get().httpPort,
   });
   await httpApi.init();
+  logger.info({ port: config.get().httpPort }, "sidecar bootstrap complete");
 
   // Step 8: Wire up graceful shutdown handlers. SIGTERM (sent by
   // `docker-compose down`) or SIGINT (Ctrl+C) trigger dispose() on all
