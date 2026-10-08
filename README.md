@@ -90,6 +90,8 @@ Set in `.env` (never committed — `.env.example` is the template). `ConfigServi
 | `JWT_SECRET` | yes | Signs session tokens. `install.sh` generates one with `openssl rand -hex 32`; do the same if setting up by hand. |
 | `ENCRYPTION_KEY` | yes | 64 hex chars (32 bytes) for AES-256-GCM — encrypts destination stream keys at rest. A different key from `JWT_SECRET` on purpose (signing and at-rest encryption are different cryptographic purposes). `install.sh` generates this one too; by hand it's the same `openssl rand -hex 32`. |
 | `HTTP_PORT` | no (defaults to `8080`) | Where the dashboard/API listens. |
+| `DEBUG` | no (defaults to unset) | Set to `1` or `true` to enable debug-level logging with pretty-printed output. Defaults to info-level with structured JSON output. See [Debugging](#debugging) below. |
+| `LOG_LEVEL` | no (defaults to `debug` if `DEBUG=1`, else `info`) | Fine-grained log level control: `debug`, `info`, `warn`, `error`, `fatal`. Independent of `DEBUG` — can use JSON output at debug level, or pretty-print at warn level. |
 
 Destination stream keys (Mixcloud/YouTube/Twitch) are **not** env vars — they live in Mongo, per user, set through the dashboard itself after you log in.
 
@@ -299,6 +301,47 @@ Two workflows, both required on every PR into `staging` and on `staging → main
 
 Branch flow: `feature/* → staging → main`, `staging` always green, `main` receives only deliberate merges. See `docs/TECHNICAL.md` §CI/CD pipeline for the full reasoning, including what these checks *can't* catch (the two conditional-auth cases documented in `openapi.yaml`'s own `info.description`).
 
+## Debugging
+
+### Structured logging & DEBUG mode
+
+The sidecar uses **Pino** for structured logging. By default, logs are emitted as JSON (machine-readable, production-friendly). For development, enable DEBUG mode for pretty-printed, human-readable output:
+
+**Local development:**
+```bash
+DEBUG=1 bun run dev    # pretty-printed logs with colors
+```
+
+**Docker deployment:**
+```bash
+DEBUG=1 docker compose up    # relay container logs in pretty-print mode
+```
+
+**Log levels** (in order of verbosity):
+- `debug` — detailed startup steps, module initialization, event handling
+- `info` — startup complete, server listening, important state changes (default)
+- `warn` — connection failures, retries, graceful degradation
+- `error` — unrecoverable errors
+- `fatal` — process-level failures, exits
+
+**Examples:**
+
+```bash
+# Pretty-print debug logs (development)
+DEBUG=1 bun run dev
+
+# JSON logs at debug level (logs to a file for analysis)
+LOG_LEVEL=debug bun run dev
+
+# Filter to warnings only (quiet production monitoring)
+LOG_LEVEL=warn docker compose up
+
+# Combine both: pretty-print at a specific level
+DEBUG=1 LOG_LEVEL=warn bun run dev
+```
+
+All logs include context (module name, request ID, error messages, stack traces where relevant), and sensitive fields (stream keys, passwords, tokens) are automatically redacted.
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -308,6 +351,7 @@ Branch flow: `feature/* → staging → main`, `staging` always green, `main` re
 | Edited `src/static/*` but the browser doesn't reflect it | Static files aren't watched — restart `bun run dev` (see [Working on the frontend](#working-on-the-frontend)). |
 | `bun run test:integration` fails to connect | Needs the Mongo container running — same fix as above. Uses `MONGO_TEST_URI` if set, otherwise the same URI as dev. |
 | Registration returns 401/403 after the first account | Working as intended — only the very first call (empty `users` collection) is unauthenticated. Every account after that needs an admin JWT, via the dashboard's "Register a user" form while logged in as admin. |
+| Sidecar exits with code 1 but no error message | Enable DEBUG mode with `DEBUG=1 bun run dev` to see detailed startup logs and the actual error. |
 
 ## License
 

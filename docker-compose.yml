@@ -29,6 +29,8 @@ services:
       # Pass HOST_IP from .env or auto-detect on host machine
       RTMP_HOST_IP: *host-ip
       RTMP_PORT: ${RTMP_PORT:-1935}
+      # Enable structured logging with pretty-print (DEBUG=1) or JSON (default)
+      DEBUG: ${DEBUG:-}
     # Security: drop all capabilities, add back only what's needed
     cap_drop:
       - ALL
