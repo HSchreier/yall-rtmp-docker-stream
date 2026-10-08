@@ -3,7 +3,6 @@
 
 import { jsonResponse } from "../../infra/http.ts";
 import type { MongoService } from "../../infra/mongo-service.ts";
-import { networkInterfaces } from "node:os";
 
 function getLocalIpOrHostname(): string {
   // Priority 1: explicit env var (for staging/prod override)
@@ -42,7 +41,7 @@ export class HealthRouter {
     }
   }
 
-  async handle(req: Request, url: URL, clientIp: string | null): Promise<Response | undefined> {
+  async handle(req: Request, url: URL, _clientIp: string | null): Promise<Response | undefined> {
     if (url.pathname === "/health" && req.method === "GET") {
       const nginxReachable = await this.isNginxReachable();
       return jsonResponse(200, {

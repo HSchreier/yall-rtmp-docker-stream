@@ -59,10 +59,7 @@ export interface App {
 export async function bootstrap(): Promise<App> {
   // Step 0: Logger first — everything after this has somewhere to log to.
   const logger = new Logger();
-  logger.info(
-    { pid: process.pid, nodeVersion: process.version },
-    "sidecar bootstrap starting",
-  );
+  logger.info({ pid: process.pid, nodeVersion: process.version }, "sidecar bootstrap starting");
 
   // Step 0, continued: the process-level safety net, registered before any
   // other init() runs. Something reaching this point escaped every other
@@ -138,10 +135,7 @@ export async function bootstrap(): Promise<App> {
     httpPort: config.get().httpPort,
   });
   await nginxProcessManager.init();
-  logger.debug(
-    { running: nginxProcessManager.isRunning() },
-    "NginxProcessManager: init complete",
-  );
+  logger.debug({ running: nginxProcessManager.isRunning() }, "NginxProcessManager: init complete");
 
   // Step 4b: StreamState — domain singleton tracking broadcast status,
   // driven by EventBus subscriptions to stream lifecycle events. Also

@@ -21,7 +21,7 @@ export class UsersRouter {
     private readonly auth: AuthService,
   ) {}
 
-  async handle(req: Request, url: URL, clientIp: string | null): Promise<Response | undefined> {
+  async handle(req: Request, url: URL, _clientIp: string | null): Promise<Response | undefined> {
     const { pathname } = url;
 
     if (pathname === "/users/me" && req.method === "GET") {
