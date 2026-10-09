@@ -40,7 +40,13 @@ export class ConfigService {
       throw new Error(`ConfigService: missing required env var(s): ${missing.join(", ")}`);
     }
 
-    if (!ENCRYPTION_KEY_HEX_RE.test(encryptionKeyHex)) {
+    // After guard checks above, these are guaranteed non-undefined
+    // TypeScript needs explicit narrowing for control flow after conditionals
+    const mongoUriValid = mongoUri!;
+    const jwtSecretValid = jwtSecret!;
+    const encryptionKeyValid = encryptionKeyHex!;
+
+    if (!ENCRYPTION_KEY_HEX_RE.test(encryptionKeyValid)) {
       throw new Error(
         "ConfigService: ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes) — generate with `openssl rand -hex 32`",
       );
@@ -52,10 +58,10 @@ export class ConfigService {
     }
 
     this.#config = {
-      mongoUri,
-      jwtSecret,
+      mongoUri: mongoUriValid,
+      jwtSecret: jwtSecretValid,
       httpPort,
-      encryptionKey: Buffer.from(encryptionKeyHex, "hex"),
+      encryptionKey: Buffer.from(encryptionKeyValid, "hex"),
     };
     this.logger.info({ httpPort }, "ConfigService: bootstrap config validated");
   }

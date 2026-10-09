@@ -38,22 +38,25 @@ import type { UserRepository } from "./modules/users/users.repository.ts";
 // dev-server feature, so tsc sees these as HTMLBundle even though Bun's
 // bundler actually resolves them as plain text at both dev and compile
 // time per the `type: "text"` attribute — see text-assets.d.ts.
+// HTML imports conflict with bun-types' HTMLBundle; cast to string for tsc
+// bun's bundler ignores tsc's types and honors `with { type: "text" }` at runtime
 import adminDashboardHtmlRaw from "./static/admin-dashboard.html" with { type: "text" };
-import appCss from "./static/app.css" with { type: "text" };
-import appJs from "./static/app.js" with { type: "text" };
 import dashboardHtmlRaw from "./static/dashboard.html" with { type: "text" };
 import loginHtmlRaw from "./static/login.html" with { type: "text" };
 import settingsHtmlRaw from "./static/settings.html" with { type: "text" };
 import setupHtmlRaw from "./static/setup.html" with { type: "text" };
-import templateJs from "./static/template.js" with { type: "text" };
 import userDashboardHtmlRaw from "./static/user-dashboard.html" with { type: "text" };
 
-const adminDashboardHtml = adminDashboardHtmlRaw;
-const dashboardHtml = dashboardHtmlRaw;
-const loginHtml = loginHtmlRaw;
-const settingsHtml = settingsHtmlRaw;
-const setupHtml = setupHtmlRaw;
-const userDashboardHtml = userDashboardHtmlRaw;
+import appCss from "./static/app.css" with { type: "text" };
+import appJs from "./static/app.js" with { type: "text" };
+import templateJs from "./static/template.js" with { type: "text" };
+
+const adminDashboardHtml = adminDashboardHtmlRaw as unknown as string;
+const dashboardHtml = dashboardHtmlRaw as unknown as string;
+const loginHtml = loginHtmlRaw as unknown as string;
+const settingsHtml = settingsHtmlRaw as unknown as string;
+const setupHtml = setupHtmlRaw as unknown as string;
+const userDashboardHtml = userDashboardHtmlRaw as unknown as string;
 
 export interface ModuleRouter {
   handle(req: Request, url: URL, clientIp: string | null): Promise<Response | undefined>;
