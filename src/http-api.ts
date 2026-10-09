@@ -41,15 +41,14 @@ import type { UserRepository } from "./modules/users/users.repository.ts";
 // HTML imports conflict with bun-types' HTMLBundle; cast to string for tsc
 // bun's bundler ignores tsc's types and honors `with { type: "text" }` at runtime
 import adminDashboardHtmlRaw from "./static/admin-dashboard.html" with { type: "text" };
+import appCss from "./static/app.css" with { type: "text" };
+import appJs from "./static/app.js" with { type: "text" };
 import dashboardHtmlRaw from "./static/dashboard.html" with { type: "text" };
 import loginHtmlRaw from "./static/login.html" with { type: "text" };
 import settingsHtmlRaw from "./static/settings.html" with { type: "text" };
 import setupHtmlRaw from "./static/setup.html" with { type: "text" };
-import userDashboardHtmlRaw from "./static/user-dashboard.html" with { type: "text" };
-
-import appCss from "./static/app.css" with { type: "text" };
-import appJs from "./static/app.js" with { type: "text" };
 import templateJs from "./static/template.js" with { type: "text" };
+import userDashboardHtmlRaw from "./static/user-dashboard.html" with { type: "text" };
 
 const adminDashboardHtml = adminDashboardHtmlRaw as unknown as string;
 const dashboardHtml = dashboardHtmlRaw as unknown as string;

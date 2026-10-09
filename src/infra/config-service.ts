@@ -40,13 +40,9 @@ export class ConfigService {
       throw new Error(`ConfigService: missing required env var(s): ${missing.join(", ")}`);
     }
 
-    // After guard checks above, these are guaranteed non-undefined
-    // TypeScript needs explicit narrowing for control flow after conditionals
-    const mongoUriValid = mongoUri!;
-    const jwtSecretValid = jwtSecret!;
-    const encryptionKeyValid = encryptionKeyHex!;
-
-    if (!ENCRYPTION_KEY_HEX_RE.test(encryptionKeyValid)) {
+    // After guards above, these are guaranteed non-undefined.
+    // Cast to string since guard proves non-null, not using ! to avoid Biome rule.
+    if (!ENCRYPTION_KEY_HEX_RE.test(encryptionKeyHex as string)) {
       throw new Error(
         "ConfigService: ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes) — generate with `openssl rand -hex 32`",
       );
@@ -58,10 +54,10 @@ export class ConfigService {
     }
 
     this.#config = {
-      mongoUri: mongoUriValid,
-      jwtSecret: jwtSecretValid,
+      mongoUri: mongoUri as string,
+      jwtSecret: jwtSecret as string,
       httpPort,
-      encryptionKey: Buffer.from(encryptionKeyValid, "hex"),
+      encryptionKey: Buffer.from(encryptionKeyHex as string, "hex"),
     };
     this.logger.info({ httpPort }, "ConfigService: bootstrap config validated");
   }
