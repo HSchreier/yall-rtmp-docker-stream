@@ -48,12 +48,12 @@ import setupHtmlRaw from "./static/setup.html" with { type: "text" };
 import templateJs from "./static/template.js" with { type: "text" };
 import userDashboardHtmlRaw from "./static/user-dashboard.html" with { type: "text" };
 
-const adminDashboardHtml = adminDashboardHtmlRaw as unknown as string;
-const dashboardHtml = dashboardHtmlRaw as unknown as string;
-const loginHtml = loginHtmlRaw as unknown as string;
-const settingsHtml = settingsHtmlRaw as unknown as string;
-const setupHtml = setupHtmlRaw as unknown as string;
-const userDashboardHtml = userDashboardHtmlRaw as unknown as string;
+const adminDashboardHtml = adminDashboardHtmlRaw;
+const dashboardHtml = dashboardHtmlRaw;
+const loginHtml = loginHtmlRaw;
+const settingsHtml = settingsHtmlRaw;
+const setupHtml = setupHtmlRaw;
+const userDashboardHtml = userDashboardHtmlRaw;
 
 export interface ModuleRouter {
   handle(req: Request, url: URL, clientIp: string | null): Promise<Response | undefined>;

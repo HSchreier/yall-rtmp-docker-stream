@@ -40,22 +40,22 @@ export class ConfigService {
       throw new Error(`ConfigService: missing required env var(s): ${missing.join(", ")}`);
     }
 
-    if (!ENCRYPTION_KEY_HEX_RE.test(encryptionKeyHex as string)) {
+    if (!ENCRYPTION_KEY_HEX_RE.test(encryptionKeyHex)) {
       throw new Error(
         "ConfigService: ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes) — generate with `openssl rand -hex 32`",
       );
     }
 
-    const httpPort = Number(httpPortRaw);
+    const httpPort = parseInt(httpPortRaw, 10);
     if (!Number.isInteger(httpPort) || httpPort <= 0) {
       throw new Error(`ConfigService: HTTP_PORT must be a positive integer, got "${httpPortRaw}"`);
     }
 
     this.#config = {
-      mongoUri: mongoUri as string,
-      jwtSecret: jwtSecret as string,
+      mongoUri,
+      jwtSecret,
       httpPort,
-      encryptionKey: Buffer.from(encryptionKeyHex as string, "hex"),
+      encryptionKey: Buffer.from(encryptionKeyHex, "hex"),
     };
     this.logger.info({ httpPort }, "ConfigService: bootstrap config validated");
   }

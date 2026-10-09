@@ -81,7 +81,7 @@ export class UserRepository {
 
   async list(): Promise<UserDoc[]> {
     const rows = await this.#collection.find({}).sort({ createdAt: 1 }).toArray();
-    return (rows as UserRow[]).map(toDoc);
+    return rows.map(toDoc);
   }
 
   async create(input: {
@@ -91,7 +91,7 @@ export class UserRepository {
     registeredBy: string | null;
   }): Promise<UserDoc> {
     const now = new Date();
-    const expiry = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000); // 90 days
+    const expiry = new Date(now.getTime() + STREAM_KEY_EXPIRY_MS);
     const row: Omit<UserRow, "_id"> = {
       email: input.email,
       passwordHash: input.passwordHash,
@@ -131,7 +131,7 @@ export class UserRepository {
   async regenerateStreamKey(userId: string): Promise<UserDoc | null> {
     if (!ObjectId.isValid(userId)) return null;
     const now = new Date();
-    const expiry = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000); // 90 days
+    const expiry = new Date(now.getTime() + STREAM_KEY_EXPIRY_MS);
     const result = await this.#collection.findOneAndUpdate(
       { _id: new ObjectId(userId) } as never,
       { $set: { streamKey: generateStreamKey(), streamKeyExpiry: expiry } },
@@ -146,11 +146,13 @@ export class UserRepository {
   }
 }
 
+const STREAM_KEY_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+const STREAM_KEY_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
+
 function generateStreamKey(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let key = "";
-  for (let i = 0; i < 32; i++) {
-    key += chars.charAt(Math.floor(Math.random() * chars.length));
+  for (let i: number = 0; i < 32; i++) {
+    key += STREAM_KEY_CHARS.charAt(Math.floor(Math.random() * STREAM_KEY_CHARS.length));
   }
   return key;
 }

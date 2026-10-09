@@ -3,14 +3,14 @@ import { cpus, freemem, totalmem, uptime } from "node:os";
 interface ProcessMetrics {
   pid: number;
   memory: {
-    rss: number; // Resident Set Size (MB)
-    heapUsed: number; // Heap memory in use (MB)
-    heapTotal: number; // Total heap memory (MB)
-    external: number; // External memory (MB)
+    rss: number; // Resident Set Size (MB, integer)
+    heapUsed: number; // Heap memory in use (MB, integer)
+    heapTotal: number; // Total heap memory (MB, integer)
+    external: number; // External memory (MB, integer)
   };
   cpu: {
-    user: number; // CPU user time (ms)
-    system: number; // CPU system time (ms)
+    user: number; // CPU user time (ms, integer)
+    system: number; // CPU system time (ms, integer)
   };
   uptime: number; // Process uptime (seconds)
 }
@@ -73,8 +73,8 @@ export class MetricsService {
 
   private calculateCpuUsage(): number {
     const cpuList = cpus();
-    let totalIdle = 0;
-    let totalTick = 0;
+    let totalIdle: number = 0;
+    let totalTick: number = 0;
 
     cpuList.forEach((cpu) => {
       for (const type in cpu.times) {
@@ -85,7 +85,7 @@ export class MetricsService {
 
     const idle = totalIdle / cpuList.length;
     const total = totalTick / cpuList.length;
-    const usage = 100 - ~~((100 * idle) / total);
+    const usage = 100 - Math.floor((100 * idle) / total);
 
     return Math.max(0, Math.min(100, usage));
   }
