@@ -23,7 +23,7 @@ import {
 } from "../../infra/errors.ts";
 import type { EventBus } from "../../infra/event-bus.ts";
 import type { Role } from "../../infra/events.ts";
-import { EMAIL_RE, MIN_PASSWORD_LENGTH } from "../../infra/validators.ts";
+import { EMAIL_RE, MIN_PASSWORD_LENGTH, PASSWORD_COMPLEXITY_RE } from "../../infra/validators.ts";
 import type { JwtPayload } from "../auth/auth.service.ts";
 import type { DestinationProfileRepository } from "../profiles/profiles.repository.ts";
 import type { RelayStateRepository } from "../relay/relay.repository.ts";
@@ -85,6 +85,11 @@ export class UsersService {
     }
     if (input.password.length < MIN_PASSWORD_LENGTH) {
       throw new ValidationError(`Password needs at least ${MIN_PASSWORD_LENGTH} characters.`);
+    }
+    if (!PASSWORD_COMPLEXITY_RE.test(input.password)) {
+      throw new ValidationError(
+        "Password must include uppercase, lowercase, number, and special character (@$!%*?&).",
+      );
     }
 
     const existing = await this.users.findByEmail(input.email);
@@ -203,6 +208,11 @@ export class UsersService {
     if (patch.password !== undefined) {
       if (patch.password.length < MIN_PASSWORD_LENGTH) {
         throw new ValidationError(`Password needs at least ${MIN_PASSWORD_LENGTH} characters.`);
+      }
+      if (!PASSWORD_COMPLEXITY_RE.test(patch.password)) {
+        throw new ValidationError(
+          "Password must include uppercase, lowercase, number, and special character (@$!%*?&).",
+        );
       }
       repoPatch.passwordHash = await Bun.password.hash(patch.password);
       changedFields.push("password");

@@ -5,13 +5,15 @@
 
 import type { AuthService, JwtPayload } from "../modules/auth/auth.service.ts";
 import { AuthError } from "./errors.ts";
+import { BEARER_TOKEN_RE } from "./validators.ts";
 
 const SESSION_COOKIE_RE = /(?:^|;\s*)session=([^;]+)/;
 
 export function tryAuth(req: Request, auth: AuthService): JwtPayload | null {
   const authHeader = req.headers.get("authorization");
-  if (authHeader?.startsWith("Bearer ")) {
-    return auth.verifyToken(authHeader.slice(7));
+  if (authHeader && BEARER_TOKEN_RE.test(authHeader)) {
+    const token = authHeader.slice(7); // Remove "Bearer " prefix
+    return auth.verifyToken(token);
   }
   const cookieHeader = req.headers.get("cookie");
   const token = cookieHeader?.match(SESSION_COOKIE_RE)?.[1];

@@ -16,7 +16,7 @@ import jwt from "jsonwebtoken";
 import { AuthError, ConflictError, ForbiddenError, ValidationError } from "../../infra/errors.ts";
 import type { EventBus } from "../../infra/event-bus.ts";
 import type { Role } from "../../infra/events.ts";
-import { EMAIL_RE, MIN_PASSWORD_LENGTH } from "../../infra/validators.ts";
+import { EMAIL_RE, MIN_PASSWORD_LENGTH, PASSWORD_COMPLEXITY_RE } from "../../infra/validators.ts";
 import type { UserRepository } from "../users/users.repository.ts";
 
 // JWT lifetime is an open question in docs/TECHNICAL.md — 12h picked as a
@@ -50,6 +50,11 @@ export class AuthService {
     }
     if (input.password.length < MIN_PASSWORD_LENGTH) {
       throw new ValidationError(`Password needs at least ${MIN_PASSWORD_LENGTH} characters.`);
+    }
+    if (!PASSWORD_COMPLEXITY_RE.test(input.password)) {
+      throw new ValidationError(
+        "Password must include uppercase, lowercase, number, and special character (@$!%*?&).",
+      );
     }
 
     const isBootstrap = await this.users.isEmpty();
