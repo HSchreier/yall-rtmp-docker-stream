@@ -5,10 +5,7 @@
 // services, never reaches into a repository directly.
 
 import { ValidationError } from "../../infra/errors.ts";
-import {
-  RTMP_URL_RE,
-  STREAM_KEY_FORMAT_PLATFORM_RE,
-} from "../../infra/validators.ts";
+import { RTMP_URL_RE, STREAM_KEY_FORMAT_PLATFORM_RE } from "../../infra/validators.ts";
 import type { RelayStateRepository } from "../relay/relay.repository.ts";
 import type {
   DestinationProfileDoc,
@@ -38,7 +35,9 @@ export class ProfileService {
         throw new ValidationError("YouTube: Stream key (RTMPS) is required.");
       }
       if (!STREAM_KEY_FORMAT_PLATFORM_RE.test(key)) {
-        throw new ValidationError("YouTube: Stream key format invalid (alphanumeric/dash/underscore, 10-200 chars).");
+        throw new ValidationError(
+          "YouTube: Stream key format invalid (alphanumeric/dash/underscore, 10-200 chars).",
+        );
       }
     }
 
@@ -49,7 +48,9 @@ export class ProfileService {
         throw new ValidationError("Twitch: Stream key is required.");
       }
       if (!STREAM_KEY_FORMAT_PLATFORM_RE.test(key)) {
-        throw new ValidationError("Twitch: Stream key format invalid (alphanumeric/dash/underscore, 10-200 chars).");
+        throw new ValidationError(
+          "Twitch: Stream key format invalid (alphanumeric/dash/underscore, 10-200 chars).",
+        );
       }
     }
 
