@@ -13,8 +13,8 @@ export const PASSWORD_COMPLEXITY_RE = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%
 // Stream key: alphanumeric + dash/underscore, exactly 32 chars (matches generateStreamKey output)
 export const STREAM_KEY_FORMAT_RE = /^[A-Za-z0-9_-]{32}$/;
 
-// RTMP URL: must start with rtmp:// or rtmps:// followed by valid characters
-export const RTMP_URL_RE = /^rtmps?:\/\/[a-zA-Z0-9.-]+(:\d+)?\/[a-zA-Z0-9_.\-/]+$/;
+// RTMP URL: must start with rtmp:// or rtmps:// followed by host and optional port/path
+export const RTMP_URL_RE = /^rtmps?:\/\/[a-zA-Z0-9.-]+(:\d+)?(\/[a-zA-Z0-9_.\-/]*)?$/;
 
 // Bearer token: "Bearer " followed by at least one non-whitespace character
 export const BEARER_TOKEN_RE = /^Bearer\s+[^\s]+$/;
