@@ -195,7 +195,7 @@ describe("UsersService.updateUser", () => {
 
     const result = await service.updateUser(
       "u1",
-      { email: "new@example.com", password: "a-new-long-password" },
+      { email: "new@example.com", password: "NewPassword123@Secure" },
       asUser("u1"),
     );
     expect(result.email).toBe("new@example.com");
