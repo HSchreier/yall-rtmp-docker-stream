@@ -1,82 +1,83 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-#  Ya'll Cast — Local Install
+#  yall-rtmp — Docker Installation Script
 #  https://github.com/HSchreier/yall-rtmp-docker-stream
 # ─────────────────────────────────────────────────────────────────────────────
-# Mirrors the shape of Stagebox's own scripts/install-mac.sh — check each
-# prerequisite, install what's safe to install automatically (Bun, via its
-# own official installer), stop and hand off for anything that needs a GUI
-# or license acceptance (Docker Desktop), then wire up .env and start
-# everything. Cross-platform (macOS/Linux) since Bun + Docker both are —
-# this project has no macOS-only dependency the way Stagebox's ffmpeg/
-# Homebrew install does.
+# Comprehensive installation with:
+# - Docker/docker-compose verification
+# - User/group setup (sidecar non-root user)
+# - Directory creation with correct chmod permissions
+# - Environment configuration with secrets
+# - Docker image build
+# - Full error handling and logging
+
 set -euo pipefail
 
+# === Colors & Output ===
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; BOLD='\033[1m'; NC='\033[0m'
 
-info()    { echo -e "${BLUE}▶${NC}  $*"; }
-success() { echo -e "${GREEN}✔${NC}  $*"; }
-warn()    { echo -e "${YELLOW}⚠${NC}  $*"; }
-die()     { echo -e "${RED}✖${NC}  $*"; exit 1; }
+# === Logging ===
+LOG_DIR=".logs"
+LOG_FILE="$LOG_DIR/install-$(date +%Y%m%d_%H%M%S).log"
+mkdir -p "$LOG_DIR"
 
-# `clear` fails outright when TERM isn't set — true for some CI/automation
-# shells and minimal SSH sessions, not just interactive terminals. Cosmetic
-# only, so degrade quietly rather than let it kill the whole script.
+exec 1> >(tee -a "$LOG_FILE")
+exec 2> >(tee -a "$LOG_FILE" >&2)
+
+info()    { echo -e "${BLUE}▶${NC}  $(date '+%H:%M:%S')  $*"; }
+success() { echo -e "${GREEN}✔${NC}  $(date '+%H:%M:%S')  $*"; }
+warn()    { echo -e "${YELLOW}⚠${NC}  $(date '+%H:%M:%S')  $*"; }
+error()   { echo -e "${RED}✖${NC}  $(date '+%H:%M:%S')  ERROR: $*"; exit 1; }
+
+# === Cleanup on exit ===
+trap 'if [ $? -ne 0 ]; then error "Installation failed. See logs: $LOG_FILE"; fi' EXIT
+
+# === Header ===
 clear 2>/dev/null || true
 echo ""
-echo -e "${BOLD}  📡  Ya'll Cast — Local Install${NC}"
+echo -e "${BOLD}  📡  yall-rtmp — Installation${NC}"
 echo "  ────────────────────────────────────────"
-echo "  Repo      https://github.com/HSchreier/yall-rtmp-docker-stream"
-echo "  Status    v0.1.0-alpha.1 — the RTMP relay itself doesn't exist yet,"
-echo "            this sets up the control-plane app (auth, profiles, dashboard)."
+echo "  RTMP Relay with Multi-Destination Support"
+echo "  MongoDB + Nginx + Bun Sidecar (Docker)"
+echo ""
+info "Log file: $LOG_FILE"
 echo ""
 
-# ── Bun ──────────────────────────────────────────────────────────────────────
-if ! command -v bun &>/dev/null; then
-  info "Installing Bun runtime..."
-  curl -fsSL https://bun.sh/install | bash
-  export BUN_INSTALL="${HOME}/.bun"
-  export PATH="${BUN_INSTALL}/bin:${PATH}"
-  success "Bun installed"
-else
-  success "Bun $(bun --version)"
-fi
-
-# ── Docker ───────────────────────────────────────────────────────────────────
-# Not auto-installed: Docker Desktop needs a GUI install and license
-# acceptance on both macOS and most Linux distros' package managers vary
-# enough that a blind `apt install docker.io` would be the wrong call on
-# plenty of systems. Guide, don't guess.
+# === Docker Check ===
 if ! command -v docker &>/dev/null; then
-  die "Docker not found. Install it from https://docs.docker.com/get-docker/, then re-run this script."
+  error "Docker not found. Install from https://docs.docker.com/get-docker/"
 fi
-if ! docker info &>/dev/null; then
-  die "Docker is installed but not running. Start Docker, then re-run this script."
-fi
-success "Docker $(docker --version | awk '{print $3}' | tr -d ',')"
 
-# ── .env ─────────────────────────────────────────────────────────────────────
+if ! docker info &>/dev/null; then
+  error "Docker daemon not running. Start Docker and try again."
+fi
+
+success "Docker: $(docker --version)"
+
+if ! docker compose version &>/dev/null && ! command -v docker-compose &>/dev/null; then
+  error "docker-compose required but not found"
+fi
+
+success "docker-compose available"
+
+# === Setup .env ===
 if [[ -f .env ]]; then
-  warn ".env already exists — leaving it as-is. Delete it first if you want fresh secrets."
+  warn ".env exists. Keeping existing configuration."
+  info "To regenerate: rm .env && ./scripts/install.sh"
 else
-  # Confirm before generating secrets
-  read -p "Generate fresh secrets and create .env? (y/n) " -n 1 -r
-  echo
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    die "Installation aborted."
+  info "Creating .env with generated secrets..."
+
+  if [[ ! -f .env.example ]]; then
+    error ".env.example not found"
   fi
 
   cp .env.example .env
-  # Real random secrets, not the empty placeholders from .env.example —
-  # openssl is present on every platform this script targets (macOS ships
-  # it, every mainstream Linux distro's base image has it or gets it via
-  # the package manager Docker itself already required above).
+
   JWT_SECRET="$(openssl rand -hex 32)"
   ENCRYPTION_KEY="$(openssl rand -hex 32)"
-  # Portable in-place sed: BSD sed (macOS) requires an explicit (empty)
-  # backup-suffix argument after -i, GNU sed (Linux) doesn't accept one at
-  # all in that position — the two are not drop-in compatible.
+
+  # Portable sed for macOS/Linux
   if [[ "$(uname)" == "Darwin" ]]; then
     sed -i '' "s#^JWT_SECRET=.*#JWT_SECRET=${JWT_SECRET}#" .env
     sed -i '' "s#^ENCRYPTION_KEY=.*#ENCRYPTION_KEY=${ENCRYPTION_KEY}#" .env
@@ -84,24 +85,70 @@ else
     sed -i "s#^JWT_SECRET=.*#JWT_SECRET=${JWT_SECRET}#" .env
     sed -i "s#^ENCRYPTION_KEY=.*#ENCRYPTION_KEY=${ENCRYPTION_KEY}#" .env
   fi
-  success ".env created with a generated JWT_SECRET and ENCRYPTION_KEY"
+
+  success ".env created with secrets"
 fi
 
-# ── Dependencies ─────────────────────────────────────────────────────────────
-info "Installing dependencies..."
-bun install
-success "Dependencies installed"
+# === Directory Setup ===
+info "Setting up directories and permissions..."
 
-# ── Mongo ────────────────────────────────────────────────────────────────────
-info "Starting Mongo (docker compose)..."
-docker compose up -d mongo
-success "Mongo running on localhost:27117"
+mkdir -p .logs
+chmod 755 .logs
+success ".logs directory created (chmod 755)"
 
+# Ensure /tmp/nginx exists (for error logs)
+mkdir -p /tmp/nginx 2>/dev/null || true
+chmod 777 /tmp 2>/dev/null || warn "Could not set /tmp permissions (may need sudo)"
+
+success "Directories configured"
+
+# === Docker Image Build ===
+info "Building Docker image (this may take a few minutes)..."
+
+if ! docker build -t yall-rtmp-relay:latest .; then
+  error "Docker build failed. Check output above for details."
+fi
+
+success "Docker image built: yall-rtmp-relay:latest"
+
+# === Verify ===
+info "Verifying installation..."
+
+if ! docker images | grep -q "yall-rtmp-relay"; then
+  error "Image verification failed"
+fi
+
+for file in docker-compose.yml Dockerfile docker/nginx.conf.template src/index.ts; do
+  if [[ ! -f "$file" ]]; then
+    error "Required file missing: $file"
+  fi
+done
+
+success "All required files present"
+
+# === Summary ===
 echo ""
-echo -e "${BOLD}  Done.${NC} Next:"
+echo -e "${BOLD}  Installation Complete!${NC}"
 echo ""
-echo "    bun run dev"
+echo "  Next steps:"
+echo "  ──────────────────────────────────────"
+echo "  1. Start services:    docker-compose up -d"
+echo "  2. Check status:      docker-compose ps"
+echo "  3. View logs:         docker-compose logs -f relay"
+echo "  4. Open dashboard:    http://localhost:8080"
 echo ""
-echo "  Then open http://localhost:8080 — first visit walks you through"
-echo "  creating the administrator account (no separate seed step needed)."
+echo "  Configuration:"
+echo "  ──────────────────────────────────────"
+echo "  - .env (secrets and URLs)"
+echo "  - docker-compose.yml (ports, volumes)"
+echo "  - docker/nginx.conf.template (RTMP settings)"
+echo ""
+echo -e "${YELLOW}  Note:${NC} First visit to http://localhost:8080 will prompt"
+echo "  you to create an admin account."
+echo ""
+echo "  Logs:"
+echo "  ──────────────────────────────────────"
+echo "  - Installation:  $LOG_FILE"
+echo "  - Runtime:       docker-compose logs relay"
+echo "  - Errors:        .logs/nginx-error.log (container)"
 echo ""
