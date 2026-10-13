@@ -102,6 +102,16 @@ export function renderNginxConfig(
   for (const name of PLACEHOLDER_NAMES) {
     rendered = rendered.replaceAll(`\${${name}}`, values[name]);
   }
+  // ALWAYS ensure error_log uses /tmp (writable by non-root sidecar user)
+  // This handles both old and new template versions
+  rendered = rendered.replace(
+    /error_log\s+\/usr\/local\/nginx\/logs\/error\.log/,
+    'error_log /tmp/nginx-error.log',
+  );
+  // And ensure it stays on /tmp if already there
+  if (!rendered.includes('error_log /tmp')) {
+    throw new Error('nginx config rendering failed: error_log not properly set to /tmp');
+  }
   return rendered;
 }
 

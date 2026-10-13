@@ -127,10 +127,11 @@ COPY docker/server.sh /app/server.sh
 RUN chmod +x /app/server.sh
 
 # Security: Create non-root user for sidecar (principle of least privilege)
-# Also pre-create .logs directory so non-root user can write to it
+# Also pre-create .logs directory and nginx logs directory so non-root user can write to them
 RUN groupadd -r sidecar && useradd -r -g sidecar sidecar && \
-    mkdir -p /app/.logs && \
-    chown -R sidecar:sidecar /app
+    mkdir -p /app/.logs /usr/local/nginx/logs && \
+    chmod 755 /usr/local/nginx /usr/local/nginx/logs && \
+    chown -R sidecar:sidecar /app /usr/local/nginx/logs
 
 ENV PATH="/usr/local/nginx/sbin:${PATH}"
 ENV HTTP_PORT=8080

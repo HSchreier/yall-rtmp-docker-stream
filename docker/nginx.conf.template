@@ -32,8 +32,9 @@ worker_processes auto;
 # fatal startup errors (like this one was) still reach the sidecar's logs
 # regardless of this path — nginx writes those to its own process stderr
 # before it's even parsed `error_log`, which Node's piped `child.stderr`
-# always captures.
-error_log /usr/local/nginx/logs/error.log warn;
+# always captures. Uses /tmp which is writable by all users (sidecar) and exists
+# in both build stage (for `nginx -t` test) and runtime.
+error_log /tmp/nginx-error.log warn;
 pid /tmp/nginx.pid;
 
 events {
