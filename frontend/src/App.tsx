@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
+import { NotificationSnackbar } from './components/NotificationSnackbar';
 import { useAuthStore } from './store/auth.store';
 import './i18n/config';
 
@@ -60,6 +61,7 @@ export function App() {
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
+      <NotificationSnackbar />
       {token ? <Dashboard /> : <Login />}
     </ThemeProvider>
   );
