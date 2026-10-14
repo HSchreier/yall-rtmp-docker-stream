@@ -1,0 +1,61 @@
+{
+  "common": {
+    "appName": "Ya'll Cast",
+    "login": "Iniciar sesión",
+    "logout": "Cerrar sesión",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "close": "Cerrar"
+  },
+  "auth": {
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "loginTitle": "Inicia sesión",
+    "loginDescription": "Comprueba quién está transmitiendo, toma el control del relay o actualiza tus claves de transmisión.",
+    "signupTitle": "Registrarse",
+    "loginError": "Correo o contraseña incorrectos",
+    "invalidEmail": "Dirección de correo inválida",
+    "passwordTooShort": "La contraseña debe tener al menos 12 caracteres"
+  },
+  "dashboard": {
+    "streamingStatus": "Estado de transmisión",
+    "rtmpEndpoint": "Punto final RTMP",
+    "streamingTo": "Transmitiendo a",
+    "streamKey": "Clave de transmisión",
+    "currentlyStreaming": "Transmitiendo en directo",
+    "readyToStream": "Listo para transmitir",
+    "stopStreaming": "Detener transmisión",
+    "copyEndpoint": "Copiar",
+    "showEndpoint": "Mostrar",
+    "hideEndpoint": "Ocultar",
+    "copyKey": "Copiar",
+    "showKey": "Mostrar",
+    "hideKey": "Ocultar",
+    "regenerateKey": "Regenerar clave",
+    "notConfigured": "No configurado",
+    "configure": "Configurar",
+    "enabled": "Activado",
+    "disabled": "Desactivado"
+  },
+  "destinations": {
+    "mixcloud": "Mixcloud",
+    "youtube": "YouTube",
+    "twitch": "Twitch",
+    "configureTitle": "Configurar {{platform}}",
+    "streamKey": "Clave de transmisión",
+    "streamUrl": "URL de transmisión",
+    "saveSuccess": "{{platform}} configurado correctamente",
+    "saveFailed": "Error al guardar la configuración de {{platform}}"
+  },
+  "modals": {
+    "regenerateKeyTitle": "¿Regenerar clave de transmisión?",
+    "regenerateKeyDescription": "Se creará una nueva clave. Tu clave anterior se desactivará en 24 horas."
+  },
+  "notifications": {
+    "copied": "Copiado al portapapeles",
+    "error": "Ocurrió un error",
+    "success": "Operación exitosa"
+  }
+}

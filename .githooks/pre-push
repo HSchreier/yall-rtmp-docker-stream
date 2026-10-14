@@ -1,0 +1,17 @@
+#!/bin/bash
+# Pre-push hook: Run replica suite before pushing to remote
+
+set -e
+
+echo "🔍 Running replica suite before push..."
+echo ""
+
+if ! ./scripts/replica-suite.sh; then
+  echo ""
+  echo "❌ Replica suite failed. Fix the errors above before pushing."
+  exit 1
+fi
+
+echo ""
+echo "✅ Replica suite passed. Proceeding with push."
+exit 0

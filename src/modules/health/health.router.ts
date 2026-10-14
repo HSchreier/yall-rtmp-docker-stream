@@ -1,8 +1,9 @@
 // HealthRouter — owns /health. Tests actual connectivity to nginx and Mongo.
-// ingestStatus is still "offline" until StreamState integration is complete.
+// Returns actual ingestStatus from StreamState.
 
 import { jsonResponse } from "../../infra/http.ts";
 import type { MongoService } from "../../infra/mongo-service.ts";
+import type { StreamState } from "../relay/stream-state.ts";
 
 function getLocalIpOrHostname(): string {
   // Priority 1: explicit env var (for staging/prod override)
@@ -24,7 +25,10 @@ function getLocalIpOrHostname(): string {
 export class HealthRouter {
   readonly #rtmpRelayUrl: string;
 
-  constructor(private readonly mongo: MongoService) {
+  constructor(
+    private readonly mongo: MongoService,
+    private readonly streamState: StreamState,
+  ) {
     this.#rtmpRelayUrl = getLocalIpOrHostname();
   }
 
@@ -45,7 +49,7 @@ export class HealthRouter {
     if (url.pathname === "/health" && req.method === "GET") {
       const nginxReachable = await this.isNginxReachable();
       return jsonResponse(200, {
-        ingestStatus: "offline",
+        ingestStatus: this.streamState.getStatus(),
         nginxReachable,
         mongoReachable: this.mongo.isConnected(),
         rtmpRelayUrl: this.#rtmpRelayUrl,

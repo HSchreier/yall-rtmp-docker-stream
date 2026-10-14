@@ -157,7 +157,15 @@ export class DestinationProfileRepository {
       updatedBy,
     };
 
-    await this.#collection.replaceOne({ userId }, this.#encryptDoc(next), { upsert: true });
+    const result = await this.#collection.replaceOne({ userId }, this.#encryptDoc(next), {
+      upsert: true,
+    });
+
+    if (!result.acknowledged) {
+      throw new Error(
+        `ProfileRepository.upsert() failed: MongoDB did not acknowledge write for userId=${userId}`,
+      );
+    }
 
     // Iterate the known destination keys, not Object.keys(update) — update
     // can also carry `bufferProfile`, which isn't a Destination and has no

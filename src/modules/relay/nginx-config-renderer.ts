@@ -102,23 +102,6 @@ export function renderNginxConfig(
   for (const name of PLACEHOLDER_NAMES) {
     rendered = rendered.replaceAll(`\${${name}}`, values[name]);
   }
-  // Ensure error_log uses /dev/stderr (piped to NginxProcessManager's child.stderr)
-  if (rendered.includes('/usr/local/nginx/logs/error.log')) {
-    rendered = rendered.replace(
-      /error_log\s+\/usr\/local\/nginx\/logs\/error\.log/,
-      'error_log /dev/stderr warn;',
-    );
-  } else if (rendered.includes('/tmp/nginx-error.log')) {
-    // Also fix /tmp -> /dev/stderr
-    rendered = rendered.replace(
-      /error_log\s+\/tmp\/nginx-error\.log/,
-      'error_log /dev/stderr warn;',
-    );
-  }
-  // Validate final config
-  if (!rendered.includes('error_log /dev/stderr')) {
-    throw new Error('nginx config: error_log must use /dev/stderr');
-  }
   return rendered;
 }
 

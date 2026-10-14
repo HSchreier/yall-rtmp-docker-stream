@@ -391,19 +391,6 @@
       border-left: 4px solid var(--color-success);
     }
 
-    .modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.7);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-    }
-
     .modal-content {
       background: var(--color-surface);
       border: 1px solid var(--color-border);
@@ -629,7 +616,7 @@
       loadStreamKey();
       loadDestinationProfile();
       loadActivityLog();
-      simulateStreaming(); // Temporary for demo
+      pollStreamStatus(); // Poll /health for actual streaming status
     })();
 
     let currentDestination = null;
@@ -760,17 +747,52 @@
       });
     }
 
-    function simulateStreaming() {
-      // Demo: simulate streaming (in real app, this would come from SSE or API)
-      isStreaming = true;
-      streamStartTime = new Date();
-      updateStreamingUI();
+    function pollStreamStatus() {
+      console.log('pollStreamStatus: starting');
+      // Poll /health endpoint every 2 seconds for actual streaming status
+      const checkStatus = async () => {
+        console.log('checkStatus: polling');
+        try {
+          const res = await fetch(`${API_BASE}/health`);
+          const data = await res.json();
+          const status = data.ingestStatus; // 'offline', 'live', or 'idle'
+          console.log('checkStatus: status =', status);
 
-      setInterval(() => {
-        if (isStreaming) {
-          updateStreamingUI();
+          if (status === 'live') {
+            if (!isStreaming) {
+              isStreaming = true;
+              streamStartTime = new Date();
+            }
+          } else {
+            isStreaming = false;
+            streamStartTime = null;
+          }
+        } catch (err) {
+          console.warn('Failed to check stream status:', err);
+          isStreaming = false;
+          streamStartTime = null;
         }
-      }, 1000);
+      };
+
+      // Update UI based on streaming status
+      const updateUI = () => {
+        console.log('updateUI: isStreaming =', isStreaming);
+        if (isStreaming && streamStartTime) {
+          updateStreamingUI();
+        } else {
+          updateOfflineUI();
+        }
+      };
+
+      checkStatus(); // Initial check
+      updateUI(); // Initial UI update
+
+      // Poll status every 2 seconds
+      setInterval(checkStatus, 2000);
+
+      // Update UI every 1 second when streaming
+      setInterval(updateUI, 1000);
+      console.log('pollStreamStatus: intervals started');
     }
 
     function updateStreamingUI() {
@@ -779,12 +801,20 @@
       document.getElementById('stream-timer').style.display = 'block';
       document.getElementById('stop-btn').style.display = 'block';
 
-      const elapsed = Date.now()- streamStartTime;
+      const elapsed = Date.now() - streamStartTime;
       const hours = Math.floor(elapsed / (60 * 60 * 1000));
       const minutes = Math.floor((elapsed % (60 * 60 * 1000)) / (60 * 1000));
       const seconds = Math.floor((elapsed % (60 * 1000)) / 1000);
       document.getElementById('stream-timer').textContent =
         `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function updateOfflineUI() {
+      document.getElementById('status-indicator').textContent = '🟢';
+      document.getElementById('status-label').textContent = 'Ready to Stream';
+      document.getElementById('stream-timer').style.display = 'none';
+      document.getElementById('stop-btn').style.display = 'none';
+      streamStartTime = null;
     }
 
     function toggleEndpoint() {

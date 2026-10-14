@@ -1,0 +1,61 @@
+{
+  "common": {
+    "appName": "Ya'll Cast",
+    "login": "Log in",
+    "logout": "Log out",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "close": "Close"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Password",
+    "loginTitle": "Log in",
+    "loginDescription": "Check who's on air, take over the relay, or update your stream keys.",
+    "signupTitle": "Sign up",
+    "loginError": "Email or password incorrect",
+    "invalidEmail": "Invalid email address",
+    "passwordTooShort": "Password must be at least 12 characters"
+  },
+  "dashboard": {
+    "streamingStatus": "Streaming Status",
+    "rtmpEndpoint": "RTMP Endpoint",
+    "streamingTo": "Streaming To",
+    "streamKey": "Stream Key",
+    "currentlyStreaming": "Currently streaming",
+    "readyToStream": "Ready to Stream",
+    "stopStreaming": "Stop streaming",
+    "copyEndpoint": "Copy",
+    "showEndpoint": "Show",
+    "hideEndpoint": "Hide",
+    "copyKey": "Copy",
+    "showKey": "Show",
+    "hideKey": "Hide",
+    "regenerateKey": "Regenerate Key",
+    "notConfigured": "Not configured",
+    "configure": "Configure",
+    "enabled": "Enabled",
+    "disabled": "Disabled"
+  },
+  "destinations": {
+    "mixcloud": "Mixcloud",
+    "youtube": "YouTube",
+    "twitch": "Twitch",
+    "configureTitle": "Configure {{platform}}",
+    "streamKey": "Stream Key",
+    "streamUrl": "Stream URL",
+    "saveSuccess": "{{platform}} configured successfully",
+    "saveFailed": "Failed to save {{platform}} configuration"
+  },
+  "modals": {
+    "regenerateKeyTitle": "Regenerate Stream Key?",
+    "regenerateKeyDescription": "A new key will be created. Your old key will become inactive in 24 hours."
+  },
+  "notifications": {
+    "copied": "Copied to clipboard",
+    "error": "An error occurred",
+    "success": "Operation successful"
+  }
+}

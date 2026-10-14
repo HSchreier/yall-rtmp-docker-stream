@@ -84,6 +84,7 @@ export class NginxProcessManager {
   #pid: number | undefined;
   #running = false;
   #stopping = false;
+  #initialized = false;
   #lastExitCode: number | null = null;
   #lastCrashError: string | undefined;
   #crashTimestamps: number[] = [];
@@ -101,6 +102,10 @@ export class NginxProcessManager {
   }
 
   async init(): Promise<void> {
+    // Register event listeners eagerly — the handlers check init status
+    // inside so we don't lose the first profile activation event.
+    this.#logger.info({}, "NginxProcessManager: registering event listeners");
+
     this.#eventBus.on("ActiveProfileChanged", (payload) => {
       this.#handleActiveProfileChanged(payload.userId).catch((err) =>
         this.#logAsyncHandlerError(err, "ActiveProfileChanged"),
@@ -112,12 +117,24 @@ export class NginxProcessManager {
       );
     });
 
-    // Restart case, not fresh install: a profile was already active before
-    // this process started, so render + start immediately rather than
-    // waiting for an ActiveProfileChanged that will never come again.
+    // Restart case: a profile was already active before this sidecar
+    // started, so render + start immediately rather than waiting for an
+    // ActiveProfileChanged that will never come again.
     const activeUserId = await this.#relayState.getActiveUserId();
     if (activeUserId) {
+      this.#logger.info(
+        { activeUserId },
+        "NginxProcessManager: restart case detected, starting nginx",
+      );
       await this.#renderAndApply(activeUserId);
+    }
+  }
+
+  // Mark initialization complete on first event (or after restart case)
+  async #markInitialized(): Promise<void> {
+    if (!this.#initialized) {
+      this.#initialized = true;
+      this.#logger.info({}, "NginxProcessManager: first activation, initialization complete");
     }
   }
 
@@ -149,10 +166,12 @@ export class NginxProcessManager {
   }
 
   async #handleActiveProfileChanged(userId: string): Promise<void> {
+    await this.#markInitialized();
     await this.#renderAndApply(userId);
   }
 
   async #handleDestinationCredentialsUpdated(userId: string): Promise<void> {
+    await this.#markInitialized();
     // Only re-render if the edited profile is the one actually live —
     // editing a profile that isn't active persists to Mongo but doesn't
     // touch nginx (docs/TECHNICAL.md, Event taxonomy, User events).
@@ -186,6 +205,7 @@ export class NginxProcessManager {
   }
 
   #spawnNginx(): void {
+    this.#logger.info({}, "NginxProcessManager: spawning nginx");
     this.#stopping = false;
     const child = this.#spawnFn(this.#nginxBinary, ["-c", this.#configPath, "-g", "daemon off;"], {
       stdio: ["ignore", "pipe", "pipe"],

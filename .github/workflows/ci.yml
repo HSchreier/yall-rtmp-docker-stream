@@ -33,7 +33,7 @@ jobs:
       - run: bun scripts/check-spec-sync.ts
 
   build-and-test:
-    name: Lint, typecheck, unit + integration tests, compile
+    name: Backend — Lint, typecheck, unit + integration tests, compile
     runs-on: ubuntu-latest
     services:
       mongo:
@@ -51,9 +51,9 @@ jobs:
         with:
           bun-version: 1.2.11
       - run: bun install --frozen-lockfile
-      - name: Lint
+      - name: Lint backend
         run: bunx @biomejs/biome check src/ scripts/ tests/
-      - name: Typecheck
+      - name: Typecheck backend
         run: bunx tsc --noEmit
       - name: Unit tests
         run: bun test tests/unit/
@@ -63,3 +63,50 @@ jobs:
         run: bun test tests/integration/
       - name: Compile (bun build --compile)
         run: bun build ./src/index.ts --compile --outfile dist/sidecar
+      - name: Upload backend build
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-build
+          path: dist/sidecar
+
+  frontend-build-and-test:
+    name: Frontend — Build, typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.11
+      - name: Install frontend dependencies
+        run: cd frontend && bun install --frozen-lockfile
+      - name: Typecheck frontend
+        run: cd frontend && bun run type-check
+      - name: Build frontend
+        run: cd frontend && bun run build
+      - name: Upload frontend build
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist/
+
+  docker-build:
+    name: Docker build + push (main/staging only)
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+    needs: [build-and-test, frontend-build-and-test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: yall-rtmp:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          outputs: type=docker,dest=/tmp/image.tar
+      - name: Upload Docker build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp/image.tar

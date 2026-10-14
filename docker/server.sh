@@ -16,38 +16,40 @@ umask 0077  # Restrict file creation to owner only (0600 files, 0700 dirs)
 #   4. Dispose MongoDB (close connection pool)
 #   5. Exit with code 0 or 1 (logged at each step)
 #
-# Usage: ./docker/server.sh [--verbose]
-#        docker compose up    # runs this script as CMD
-#        docker compose down   # sends SIGTERM after 10s, script exits cleanly
+# Usage: ./docker/server.sh [--debug]
+#        docker compose up              # runs this script as CMD (no debug logs)
+#        docker compose up -- --debug   # enable debug file logging
+#        docker compose down             # sends SIGTERM after 10s, script exits cleanly
 
 # SCRIPT_DIR is /app (server.sh is at /app/server.sh, not /app/docker/server.sh)
 SCRIPT_DIR="/app"
 PROJECT_ROOT="/app"
 LOG_DIR="${PROJECT_ROOT}/.logs"
+DEBUG_MODE="${DEBUG:-0}"
 
-# Create log directory
-mkdir -p "$LOG_DIR"
-
-# Logging functions
-log_module() {
-  local module="$1"
-  local level="$2"
-  shift 2
-  local msg="$*"
-  local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-  echo "[$timestamp] [$module] [$level] $msg" | tee -a "$LOG_DIR/${module}.log"
-}
-
+# Logging functions (stdout/stderr always, optionally to files in debug mode)
 log_error() {
   local module="$1"
   shift
-  log_module "$module" "ERROR" "$@" >&2
+  local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+  local msg="[$timestamp] [$module] [ERROR] $*"
+  echo "$msg" >&2
+  if [ "$DEBUG_MODE" = "1" ]; then
+    mkdir -p "$LOG_DIR"
+    echo "$msg" >> "$LOG_DIR/startup.log"
+  fi
 }
 
 log_info() {
   local module="$1"
   shift
-  log_module "$module" "INFO" "$@"
+  local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+  local msg="[$timestamp] [$module] [INFO] $*"
+  echo "$msg"
+  if [ "$DEBUG_MODE" = "1" ]; then
+    mkdir -p "$LOG_DIR"
+    echo "$msg" >> "$LOG_DIR/startup.log"
+  fi
 }
 
 # Module startup checks
@@ -144,27 +146,6 @@ check_rtmp_host() {
 handle_bun_error() {
   local exit_code=$?
   log_error "SIDECAR" "Bun process exited with code $exit_code"
-
-  # Check which component likely failed
-  if [ -f "$LOG_DIR/sidecar.log" ]; then
-    if grep -q "ConfigService.*error" "$LOG_DIR/sidecar.log"; then
-      log_error "CONFIG" "Configuration service failed - check env vars"
-    fi
-    if grep -q "MongoService.*error" "$LOG_DIR/sidecar.log"; then
-      log_error "MONGODB" "MongoDB connection failed - check MONGO_URI"
-    fi
-    if grep -q "NginxProcessManager.*error" "$LOG_DIR/sidecar.log"; then
-      log_error "NGINX" "Nginx process manager failed - check nginx binary"
-    fi
-    if grep -q "StreamState.*error" "$LOG_DIR/sidecar.log"; then
-      log_error "STREAM_STATE" "Stream state module failed"
-    fi
-    if grep -q "StreamOrchestrator.*error" "$LOG_DIR/sidecar.log"; then
-      log_error "STREAM_ORCHESTRATOR" "Stream orchestrator module failed"
-    fi
-  fi
-
-  log_error "SIDECAR" "See $LOG_DIR/sidecar.log for full output"
   return $exit_code
 }
 
@@ -172,14 +153,19 @@ handle_bun_error() {
 main() {
   local verbose=false
 
-  if [ "${1:-}" = "--verbose" ]; then
+  if [ "${1:-}" = "--debug" ]; then
+    DEBUG_MODE=1
     verbose=true
     set -x  # Print each command
   fi
 
+  if [ "$DEBUG_MODE" = "1" ]; then
+    mkdir -p "$LOG_DIR"
+    log_info "STARTUP" "Debug mode enabled — logs saved to $LOG_DIR/startup.log and $LOG_DIR/sidecar.log"
+  fi
+
   log_info "STARTUP" "=== RTMP Relay Startup ==="
   log_info "STARTUP" "Project root: $PROJECT_ROOT"
-  log_info "STARTUP" "Log directory: $LOG_DIR"
 
   # Pre-flight checks
   log_info "STARTUP" "Running pre-flight checks..."
@@ -228,9 +214,14 @@ main() {
     exit 1
   fi
 
-  # Run sidecar with both stdout and stderr captured to file AND to Docker logs
-  # Uses tee to split output: to the log file AND to stderr (which Docker captures)
-  $sidecar_cmd 2>&1 | tee -a "$LOG_DIR/sidecar.log" || handle_bun_error
+  # Run sidecar
+  if [ "$DEBUG_MODE" = "1" ]; then
+    # Debug mode: pipe to both stdout/stderr AND to log file
+    $sidecar_cmd 2>&1 | tee -a "$LOG_DIR/sidecar.log" || handle_bun_error
+  else
+    # Normal mode: logs go to stdout/stderr only, Docker captures them
+    $sidecar_cmd || handle_bun_error
+  fi
 }
 
 # Trap errors

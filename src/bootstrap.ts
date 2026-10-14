@@ -20,9 +20,11 @@ import { EventBus } from "./infra/event-bus.ts";
 import { Logger } from "./infra/logger.ts";
 import { MongoService } from "./infra/mongo-service.ts";
 import { WaspFilter } from "./infra/wasp-filter.ts";
+import { AdminRouter } from "./modules/admin/admin.router.ts";
 import { AuthRouter } from "./modules/auth/auth.router.ts";
 import { AuthService } from "./modules/auth/auth.service.ts";
 import { HealthRouter } from "./modules/health/health.router.ts";
+import { LogsRouter } from "./modules/logs/logs.router.ts";
 import { MetricsRouter } from "./modules/metrics/metrics.router.ts";
 import { DestinationProfileRepository } from "./modules/profiles/profiles.repository.ts";
 import { ProfilesRouter } from "./modules/profiles/profiles.router.ts";
@@ -116,6 +118,17 @@ export async function bootstrap(): Promise<App> {
   const relayState = new RelayStateRepository(mongo.db(), eventBus);
   logger.debug({}, "RelayStateRepository: constructed");
 
+  // Track current active profile to detect profile changes
+  let currentActiveUserId: string | null = null;
+  (async () => {
+    currentActiveUserId = await relayState.getActiveUserId();
+  })().catch((err) => {
+    logger.warn(
+      { err: err instanceof Error ? err.message : err },
+      "Failed to load initial active profile",
+    );
+  });
+
   // Step 3: AuthService has no init() — stateless, no side effects beyond
   // per-call behavior.
   const auth = new AuthService(users, eventBus, config.get().jwtSecret);
@@ -126,7 +139,7 @@ export async function bootstrap(): Promise<App> {
   // Ahead of the service objects below since nothing there depends on it
   // and docs/TECHNICAL.md's own numbered init order puts it here, right
   // after MongoService-dependent state exists.
-  logger.debug({}, "NginxProcessManager: initializing");
+  logger.info({}, "NginxProcessManager: initializing");
   const nginxProcessManager = new NginxProcessManager({
     logger,
     eventBus,
@@ -135,7 +148,7 @@ export async function bootstrap(): Promise<App> {
     httpPort: config.get().httpPort,
   });
   await nginxProcessManager.init();
-  logger.debug({ running: nginxProcessManager.isRunning() }, "NginxProcessManager: init complete");
+  logger.info({ running: nginxProcessManager.isRunning() }, "NginxProcessManager: init complete");
 
   // Step 4b: StreamState — domain singleton tracking broadcast status,
   // driven by EventBus subscriptions to stream lifecycle events. Also
@@ -146,6 +159,25 @@ export async function bootstrap(): Promise<App> {
   const streamState = new StreamState(eventBus);
   await streamState.init();
   logger.debug({}, "StreamState: init complete");
+
+  // Clean up stale stream state when active profile changes
+  // If a different user becomes active, emit StreamEnded to reset old stream
+  eventBus.on("ActiveProfileChanged", (payload) => {
+    if (currentActiveUserId && currentActiveUserId !== payload.userId) {
+      logger.info(
+        { prevUserId: currentActiveUserId, newUserId: payload.userId },
+        "Profile switched: emitting StreamEnded to clean up old stream state",
+      );
+      // Emit StreamEnded for the old profile to reset stream state
+      eventBus.emit("StreamEnded", {
+        streamKey: "", // old stream key unknown at this point
+        at: new Date(),
+        durationMs: 0,
+        totalBytesIn: 0,
+      });
+    }
+    currentActiveUserId = payload.userId;
+  });
 
   logger.debug({}, "StreamOrchestrator: initializing");
   const statsSessionFactory = (eb: typeof eventBus, log: typeof logger, key: string) =>
@@ -202,10 +234,12 @@ export async function bootstrap(): Promise<App> {
     new AuthRouter(auth, users),
     new UsersRouter(usersService, auth),
     new ProfilesRouter(profileService, auth),
-    new HealthRouter(mongo),
+    new HealthRouter(mongo, streamState),
     new RelayRouter(ingestEventReceiver),
     new MetricsRouter(),
     new SettingsRouter(wasp),
+    new LogsRouter(auth),
+    new AdminRouter(auth, nginxProcessManager),
   ];
   logger.debug({ count: routers.length }, "Module routers: constructed");
 
