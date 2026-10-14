@@ -173,6 +173,15 @@ export class HttpApi {
       return this.#serveAsset("/login.html");
     }
 
+    // Redirect old dashboard routes to new React frontend
+    if (
+      (pathname === "/dashboard.html" || pathname === "/user-dashboard.html") &&
+      req.method === "GET"
+    ) {
+      const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+      return redirect(frontendUrl);
+    }
+
     const staticAsset = this.#assets.get(pathname);
     if (
       staticAsset &&
