@@ -134,19 +134,43 @@ export class HttpApi {
 
   async #handle(req: Request, server: ReturnType<typeof Bun.serve>): Promise<Response> {
     const url = new URL(req.url);
+
+    // Handle CORS preflight
+    if (req.method === "OPTIONS") {
+      return this.#corsResponse();
+    }
+
     try {
       const clientIp = server.requestIP(req)?.address ?? null;
-      return await this.#route(req, url, clientIp);
+      const response = await this.#route(req, url, clientIp);
+      this.#addCorsHeaders(response);
+      return response;
     } catch (err) {
-      if (err instanceof AppError) {
-        return jsonResponse(err.status, { error: { code: err.code, message: err.message } });
+      const response = err instanceof AppError
+        ? jsonResponse(err.status, { error: { code: err.code, message: err.message } })
+        : jsonResponse(500, { error: { code: "INTERNAL", message: "Internal server error" } });
+
+      if (err instanceof Error && !(err instanceof AppError)) {
+        this.deps.logger.error(
+          { err: err.message, path: url.pathname },
+          "HttpApi: unhandled error",
+        );
       }
-      this.deps.logger.error(
-        { err: err instanceof Error ? err.message : String(err), path: url.pathname },
-        "HttpApi: unhandled error",
-      );
-      return jsonResponse(500, { error: { code: "INTERNAL", message: "Internal server error" } });
+      this.#addCorsHeaders(response);
+      return response;
     }
+  }
+
+  #corsResponse(): Response {
+    const res = new Response(null, { status: 204 });
+    this.#addCorsHeaders(res);
+    return res;
+  }
+
+  #addCorsHeaders(res: Response): void {
+    res.headers.set("Access-Control-Allow-Origin", "*");
+    res.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
   }
 
   async #route(req: Request, url: URL, clientIp: string | null): Promise<Response> {

@@ -20,7 +20,12 @@ export class AuthRouter {
   async handle(req: Request, url: URL, clientIp: string | null): Promise<Response | undefined> {
     const { pathname } = url;
 
-    if (pathname === "/me" && req.method === "GET") {
+    if ((pathname === "/auth/check-setup" || pathname === "/api/auth/check-setup") && req.method === "GET") {
+      const isEmpty = await this.users.isEmpty();
+      return jsonResponse(200, { needsSetup: isEmpty });
+    }
+
+    if ((pathname === "/me" || pathname === "/api/me") && req.method === "GET") {
       const session = requireAuth(req, this.auth);
       const user = await this.users.findById(session.userId);
       if (!user) throw new AuthError();
@@ -33,14 +38,14 @@ export class AuthRouter {
       });
     }
 
-    if (pathname === "/auth/register" && req.method === "POST") {
+    if ((pathname === "/auth/register" || pathname === "/api/auth/register") && req.method === "POST") {
       const body = await readJson<RegisterInput>(req);
       const actingUser = tryAuth(req, this.auth);
       const result = await this.auth.register(body, actingUser);
       return jsonResponse(200, result);
     }
 
-    if (pathname === "/auth/login" && req.method === "POST") {
+    if ((pathname === "/auth/login" || pathname === "/api/auth/login") && req.method === "POST") {
       const body = await readJson<{ email: string; password: string }>(req);
 
       // Rate limit: 5 attempts per 15 minutes
@@ -66,7 +71,7 @@ export class AuthRouter {
       return res;
     }
 
-    if (pathname === "/auth/logout" && req.method === "POST") {
+    if ((pathname === "/auth/logout" || pathname === "/api/auth/logout") && req.method === "POST") {
       const res = jsonResponse(200, { ok: true });
       res.headers.append("Set-Cookie", sessionCookie("", 0));
       return res;
