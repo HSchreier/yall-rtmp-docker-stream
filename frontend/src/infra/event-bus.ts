@@ -5,16 +5,16 @@ type Listener<T = unknown> = (payload: T) => void;
 type UnsubscribeFn = () => void;
 
 export interface EventMap {
-  'stream:started': { streamKey: string; at: Date };
-  'stream:ended': { streamKey: string; at: Date; durationMs: number };
-  'stream:status:changed': { status: 'offline' | 'live' | 'idle' };
-  'ui:modal:open': { modal: string };
-  'ui:modal:close': { modal: string };
-  'auth:login': { userId: string; role: string };
-  'auth:logout': {};
-  'profile:activated': { userId: string };
-  'destination:configured': { platform: string };
-  'notification:show': { message: string; type: 'info' | 'success' | 'error' | 'warning' };
+  "stream:started": { streamKey: string; at: Date };
+  "stream:ended": { streamKey: string; at: Date; durationMs: number };
+  "stream:status:changed": { status: "offline" | "live" | "idle" };
+  "ui:modal:open": { modal: string };
+  "ui:modal:close": { modal: string };
+  "auth:login": { userId: string; role: string };
+  "auth:logout": Record<string, never>;
+  "profile:activated": { userId: string };
+  "destination:configured": { platform: string };
+  "notification:show": { message: string; type: "info" | "success" | "error" | "warning" };
 }
 
 export class EventBus {
@@ -24,7 +24,7 @@ export class EventBus {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
-    this.listeners.get(event)!.add(listener as Listener);
+    this.listeners.get(event)?.add(listener as Listener);
 
     return () => {
       this.listeners.get(event)?.delete(listener as Listener);
