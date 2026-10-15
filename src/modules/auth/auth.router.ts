@@ -20,7 +20,10 @@ export class AuthRouter {
   async handle(req: Request, url: URL, clientIp: string | null): Promise<Response | undefined> {
     const { pathname } = url;
 
-    if ((pathname === "/auth/check-setup" || pathname === "/api/auth/check-setup") && req.method === "GET") {
+    if (
+      (pathname === "/auth/check-setup" || pathname === "/api/auth/check-setup") &&
+      req.method === "GET"
+    ) {
       const isEmpty = await this.users.isEmpty();
       return jsonResponse(200, { needsSetup: isEmpty });
     }
@@ -38,7 +41,10 @@ export class AuthRouter {
       });
     }
 
-    if ((pathname === "/auth/register" || pathname === "/api/auth/register") && req.method === "POST") {
+    if (
+      (pathname === "/auth/register" || pathname === "/api/auth/register") &&
+      req.method === "POST"
+    ) {
       const body = await readJson<RegisterInput>(req);
       const actingUser = tryAuth(req, this.auth);
       const result = await this.auth.register(body, actingUser);

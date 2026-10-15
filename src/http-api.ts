@@ -146,9 +146,10 @@ export class HttpApi {
       this.#addCorsHeaders(response);
       return response;
     } catch (err) {
-      const response = err instanceof AppError
-        ? jsonResponse(err.status, { error: { code: err.code, message: err.message } })
-        : jsonResponse(500, { error: { code: "INTERNAL", message: "Internal server error" } });
+      const response =
+        err instanceof AppError
+          ? jsonResponse(err.status, { error: { code: err.code, message: err.message } })
+          : jsonResponse(500, { error: { code: "INTERNAL", message: "Internal server error" } });
 
       if (err instanceof Error && !(err instanceof AppError)) {
         this.deps.logger.error(
