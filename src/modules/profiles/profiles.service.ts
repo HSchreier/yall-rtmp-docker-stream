@@ -23,6 +23,17 @@ export class ProfileService {
     return this.profiles.get(userId);
   }
 
+  async getIngestUrl(userId: string): Promise<{ url: string; key: string }> {
+    // Mock ingest URL — in production, would be derived from nginx config
+    // and the user's active status
+    const ingestBaseUrl = process.env.INGEST_URL || "rtmp://localhost:1935/live";
+    const streamKey = `stream-${userId.slice(0, 8)}`;
+    return {
+      url: ingestBaseUrl,
+      key: streamKey,
+    };
+  }
+
   upsert(
     userId: string,
     update: DestinationProfileUpdate,

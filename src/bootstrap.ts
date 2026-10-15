@@ -23,6 +23,8 @@ import { WaspFilter } from "./infra/wasp-filter.ts";
 import { AdminRouter } from "./modules/admin/admin.router.ts";
 import { AuthRouter } from "./modules/auth/auth.router.ts";
 import { AuthService } from "./modules/auth/auth.service.ts";
+import { BroadcastRouter } from "./modules/broadcast/broadcast.router.ts";
+import { BroadcastService } from "./modules/broadcast/broadcast.service.ts";
 import { HealthRouter } from "./modules/health/health.router.ts";
 import { LogsRouter } from "./modules/logs/logs.router.ts";
 import { MetricsRouter } from "./modules/metrics/metrics.router.ts";
@@ -51,6 +53,7 @@ export interface App {
   readonly destinationProfiles: DestinationProfileRepository;
   readonly relayState: RelayStateRepository;
   readonly auth: AuthService;
+  readonly broadcast: BroadcastService;
   readonly nginxProcessManager: NginxProcessManager;
   readonly streamState: StreamState;
   readonly streamOrchestrator: StreamOrchestrator;
@@ -192,13 +195,16 @@ export async function bootstrap(): Promise<App> {
   logger.debug({}, "StreamOrchestrator: init complete");
 
   // Step 5: the service objects that orchestrate across more than one
-  // repository — UsersService (list-with-status, admin activation) and
-  // ProfileService (own-profile activation). Routers below talk only to
-  // these, never to a repository directly.
+  // repository — UsersService (list-with-status, admin activation),
+  // ProfileService (own-profile activation), and BroadcastService
+  // (slot state machine). Routers below talk only to these, never to a
+  // repository directly.
   logger.debug({}, "UsersService: constructing");
   const usersService = new UsersService(users, destinationProfiles, relayState, eventBus);
   logger.debug({}, "ProfileService: constructing");
   const profileService = new ProfileService(destinationProfiles, relayState);
+  logger.debug({}, "BroadcastService: constructing");
+  const broadcastService = new BroadcastService(users, relayState, eventBus, logger);
   logger.debug({}, "IngestEventReceiver: constructing");
   const ingestEventReceiver = new IngestEventReceiver(destinationProfiles, relayState, eventBus);
 
@@ -234,8 +240,9 @@ export async function bootstrap(): Promise<App> {
     new AuthRouter(auth, users),
     new UsersRouter(usersService, auth),
     new ProfilesRouter(profileService, auth),
+    new BroadcastRouter(broadcastService, auth),
     new HealthRouter(mongo, streamState),
-    new RelayRouter(ingestEventReceiver),
+    new RelayRouter(ingestEventReceiver, nginxProcessManager, auth),
     new MetricsRouter(),
     new SettingsRouter(wasp),
     new LogsRouter(auth),
@@ -309,6 +316,7 @@ export async function bootstrap(): Promise<App> {
     destinationProfiles,
     relayState,
     auth,
+    broadcast: broadcastService,
     nginxProcessManager,
     streamState,
     streamOrchestrator,

@@ -123,6 +123,24 @@ export interface NginxCrashed {
   at: Date;
 }
 
+// Broadcast events — slot-based session lifecycle
+export interface BroadcastStarted {
+  userId: string;
+  email: string;
+  at: Date;
+}
+export interface BroadcastEnded {
+  userId: string;
+  at: Date;
+  durationSeconds: number;
+}
+export interface BroadcastKicked {
+  userId: string;
+  email: string;
+  kickedBy: string;
+  at: Date;
+}
+
 /** The full map of event name -> payload type. EventBus is generic over this. */
 export interface EventMap {
   UserLoggedIn: UserLoggedIn;
@@ -142,6 +160,9 @@ export interface EventMap {
   SecurityEvent: SecurityEvent;
   BlockExpired: BlockExpired;
   LogEvent: LogEvent;
+  BroadcastStarted: BroadcastStarted;
+  BroadcastEnded: BroadcastEnded;
+  BroadcastKicked: BroadcastKicked;
   "nginx.started": NginxStarted;
   "nginx.exited": NginxExited;
   "nginx.crashed": NginxCrashed;

@@ -1,5 +1,5 @@
 // ProfilesRouter — translates HTTP <-> ProfileService only. Owns /profile
-// (GET/PUT) and /profile/activate.
+// (GET/PUT), /profile/activate, /profile/ingest-url, and /profile/destinations.
 
 import { jsonResponse, readJson } from "../../infra/http.ts";
 import { requireAuth } from "../../infra/http-session.ts";
@@ -36,6 +36,19 @@ export class ProfilesRouter {
       const user = requireAuth(req, this.auth);
       const result = await this.profiles.activateOwn(user.userId);
       return jsonResponse(200, result);
+    }
+
+    if (pathname === "/profile/ingest-url" && req.method === "GET") {
+      const user = requireAuth(req, this.auth);
+      const ingestUrl = await this.profiles.getIngestUrl(user.userId);
+      return jsonResponse(200, ingestUrl);
+    }
+
+    if (pathname === "/profile/destinations" && req.method === "PUT") {
+      const user = requireAuth(req, this.auth);
+      const body = await readJson<DestinationProfileUpdate>(req);
+      const doc = await this.profiles.upsert(user.userId, body, user.userId);
+      return jsonResponse(200, doc);
     }
 
     return undefined;
