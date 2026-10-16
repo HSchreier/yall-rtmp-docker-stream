@@ -7,7 +7,7 @@ export class HttpClient {
   private client: AxiosInstance;
 
   constructor() {
-    const apiBase = (import.meta.env as Record<string, unknown>).VITE_API_BASE as string | undefined;
+    const apiBase = (import.meta.env as Record<string, unknown>).VITE_API_BASE_URL as string | undefined;
     const baseURL = apiBase ? `${apiBase}/api` : '/api';
     this.client = axios.create({
       baseURL,

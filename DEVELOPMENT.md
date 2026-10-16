@@ -42,6 +42,67 @@ This runs **all** checks that GitHub CI will run:
 
 If any check fails, your push is blocked with clear error output. Fix locally, then retry.
 
+## Starting Development Servers
+
+Two-script workflow:
+
+**Step 1: Start Docker containers** (run once, containers persist)
+
+```bash
+./start-docker.sh start
+```
+
+This starts MongoDB. Containers stay running across dev server restarts.
+
+**Step 2: Start dev servers** (in another terminal)
+
+```bash
+./server.sh start
+```
+
+This starts backend (8888) + frontend (5173).
+
+### Working with Services
+
+```bash
+# Follow logs while developing
+./server.sh debug all
+
+# Check status
+./server.sh status
+
+# Restart just the dev servers (Docker stays running)
+./server.sh restart
+
+# Shut down dev servers only (Docker persists)
+./server.sh stop
+
+# Start backend or frontend only
+./server.sh backend     # Backend only + tail logs
+./server.sh frontend    # Frontend only + tail logs
+
+# Clean shutdown (removes logs & PIDs)
+./server.sh shutdown
+```
+
+### Managing Docker Separately
+
+```bash
+# Restart MongoDB container (without restarting dev servers)
+./start-docker.sh restart
+
+# Stop Docker containers
+./start-docker.sh stop
+
+# View container status
+./start-docker.sh status
+
+# Follow MongoDB logs
+./start-docker.sh logs
+```
+
+All dev server logs go to `logs/` directory.
+
 ## Development Workflow
 
 ### Feature Branch
@@ -271,6 +332,57 @@ cd frontend && bun run type-check
 
 ## Useful Commands
 
+### Docker Containers
+
+```bash
+# Start MongoDB (run once, containers persist)
+./start-docker.sh start
+
+# Stop containers
+./start-docker.sh stop
+
+# Restart MongoDB
+./start-docker.sh restart
+
+# View container status
+./start-docker.sh status
+
+# Follow MongoDB logs
+./start-docker.sh logs
+```
+
+### Development Servers
+
+```bash
+# Start both backend + frontend (requires Docker running)
+./server.sh start
+
+# Start backend only (with live logs)
+./server.sh backend
+
+# Start frontend only (with live logs)
+./server.sh frontend
+
+# Follow logs
+./server.sh debug all
+./server.sh debug backend
+./server.sh debug frontend
+
+# Check status
+./server.sh status
+
+# Restart dev services (Docker stays running)
+./server.sh restart
+
+# Stop dev services
+./server.sh stop
+
+# Clean shutdown (stop + remove logs & PIDs)
+./server.sh shutdown
+```
+
+### Testing & Linting
+
 ```bash
 # Replica suite (all checks before push)
 ./scripts/replica-suite.sh
@@ -289,19 +401,21 @@ bunx @biomejs/biome check --write --unsafe src/
 
 # Type check
 bunx tsc --noEmit
+```
 
+### Building
+
+```bash
 # Build backend
 bun run build
 
 # Build frontend
 cd frontend && bun run build
+```
 
-# Run dev server (backend)
-bun run dev
+### Infrastructure
 
-# Run dev server (frontend)
-cd frontend && bun run dev
-
+```bash
 # Start MongoDB for tests
 docker-compose up mongo
 

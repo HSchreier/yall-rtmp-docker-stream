@@ -31,13 +31,50 @@ echo "  ────────────────────────
 echo ""
 info "Log file: $LOG_FILE"
 
-# === Check Prerequisites ===
-info "Checking prerequisites..."
+# === Detect LAN IP ===
+info "Detecting LAN IP..."
+
+LAN_IP=""
+
+# macOS
+if [[ "$(uname)" == "Darwin" ]]; then
+  LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)
+else
+  # Linux
+  LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || true)
+  if [[ -z "$LAN_IP" ]]; then
+    LAN_IP=$(ip route get 1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") {print $(i+1); exit}}' || true)
+  fi
+fi
+
+# Universal fallback
+if [[ -z "$LAN_IP" ]]; then
+  LAN_IP=$(ifconfig 2>/dev/null | awk '/inet / && !/127\.0\.0\.1/ {print $2; exit}' || true)
+fi
+
+if [[ -z "$LAN_IP" ]]; then
+  warn "Could not detect LAN IP, using localhost (may not work on remote networks)"
+  LAN_IP="localhost"
+fi
+
+success "LAN IP: $LAN_IP"
+
+# === Load HTTP_PORT from .env ===
+info "Loading HTTP_PORT from .env..."
 
 if [[ ! -f .env ]]; then
   error ".env not found. Run ./scripts/install.sh first"
 fi
-success ".env configured"
+
+HTTP_PORT=$(grep "^HTTP_PORT=" .env | cut -d'=' -f2 || echo "8888")
+if [[ -z "$HTTP_PORT" ]]; then
+  HTTP_PORT="8888"
+fi
+
+success ".env configured (HTTP_PORT=$HTTP_PORT)"
+
+# === Check Prerequisites ===
+info "Checking prerequisites..."
 
 if ! command -v docker &>/dev/null; then
   error "Docker not found"
@@ -56,7 +93,7 @@ success "Services starting"
 info "Waiting for services to be ready (up to 30 seconds)..."
 
 for i in {1..30}; do
-  if curl -sf http://localhost:8080/health > /dev/null 2>&1; then
+  if curl -sf "http://${LAN_IP}:${HTTP_PORT}/health" > /dev/null 2>&1; then
     success "HTTP API ready"
     break
   fi
@@ -78,7 +115,7 @@ ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
 read -sp "Admin password (must have uppercase, lowercase, digit, special char): " ADMIN_PASSWORD
 echo ""
 
-if ! curl -sf -X POST http://localhost:8080/auth/register \
+if ! curl -sf -X POST "http://${LAN_IP}:${HTTP_PORT}/auth/register" \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}" > /dev/null 2>&1; then
   error "Failed to create admin account. Check: docker-compose logs relay"
@@ -92,7 +129,7 @@ echo -e "${BOLD}  Setup Complete!${NC}"
 echo ""
 echo "  Dashboard:"
 echo "  ──────────────────────────────────────"
-echo "  URL:      http://localhost:8080"
+echo "  URL:      http://${LAN_IP}:${HTTP_PORT}"
 echo "  Email:    $ADMIN_EMAIL"
 echo ""
 echo "  RTMP Connection:"

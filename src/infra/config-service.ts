@@ -30,7 +30,7 @@ export class ConfigService {
     const mongoUri = process.env.MONGO_URI;
     const jwtSecret = process.env.JWT_SECRET;
     const encryptionKeyHex = process.env.ENCRYPTION_KEY;
-    const httpPortRaw = process.env.HTTP_PORT ?? "8080";
+    const httpPortRaw = process.env.HTTP_PORT ?? "8888";
 
     const missing: string[] = [];
     if (!mongoUri) missing.push("MONGO_URI");

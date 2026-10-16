@@ -121,7 +121,7 @@ check_mongo() {
 check_ports() {
   log_info "PORTS" "Checking port availability..."
 
-  local http_port="${HTTP_PORT:-8080}"
+  local http_port="${HTTP_PORT:-8888}"
   local rtmp_port="1935"
   local nginx_stats_port="8090"
 

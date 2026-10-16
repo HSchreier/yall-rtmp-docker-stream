@@ -15,14 +15,46 @@ A complete, production-ready **Vite + React + TypeScript** frontend project with
 
 ## Quick Start
 
-### Development
+### Development (Recommended)
+
+**Terminal 1** — Start Docker containers first:
+
+```bash
+./start-docker.sh start
+```
+
+**Terminal 2** — Start frontend (and backend):
+
+```bash
+./server.sh start
+```
+
+This starts:
+- Backend on `http://192.168.188.29:8888`
+- Frontend on `http://192.168.188.29:5173` with hot-reload
+
+### Frontend Only
+
+Start Docker first (Terminal 1):
+```bash
+./start-docker.sh start
+```
+
+Then start frontend only (Terminal 2):
+```bash
+./server.sh frontend
+```
+
+Opens at `http://192.168.188.29:5173` with hot-reload. API calls go to `http://192.168.188.29:8888`.
+
+### Manual Frontend Start
 
 ```bash
 cd frontend
 bun run dev
 ```
 
-Opens at `http://localhost:5173` with hot-reload. API calls proxy to `http://localhost:8080`.
+(Requires Docker containers running separately via `./start-docker.sh start`)
 
 ### Type Checking
 

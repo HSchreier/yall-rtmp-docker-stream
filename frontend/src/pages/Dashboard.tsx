@@ -5,12 +5,16 @@ import { Header } from "../components/Header";
 import { History } from "../components/History";
 import { Setup } from "../components/Setup";
 import { useAuthStore } from "../store/auth.store";
+import { useBroadcastStats } from "../hooks/useBroadcastStats";
 
 type TabName = "control-room" | "setup" | "history" | "admin";
 
 export function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabName>("control-room");
   const { role } = useAuthStore();
+
+  // Fetch and subscribe to real broadcast stats
+  useBroadcastStats();
 
   const handleTabChange = (tab: TabName) => {
     if (tab === "admin" && role !== "admin") {

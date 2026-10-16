@@ -25,7 +25,7 @@ export function Header({ activeTab, onTabChange }: HeaderProps) {
     >
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
         {/* Brand */}
-        <img src="/lockup-transparent.svg" alt="Ya'll Cast" style={{ height: "28px" }} />
+        <img src="/assets/brand/lockup-transparent.svg" alt="Ya'll Cast" style={{ height: "28px" }} />
       </div>
 
       {/* Slot chip in center */}

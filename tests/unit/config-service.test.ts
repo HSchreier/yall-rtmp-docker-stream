@@ -30,7 +30,7 @@ describe("ConfigService", () => {
     expect(() => service.get()).toThrow(/before init\(\)/);
   });
 
-  test("init() succeeds and get() returns validated config, HTTP_PORT defaults to 8080", () => {
+  test("init() succeeds and get() returns validated config, HTTP_PORT defaults to 8888", () => {
     process.env.MONGO_URI = "mongodb://localhost:27017/test";
     process.env.JWT_SECRET = "test-secret";
     process.env.ENCRYPTION_KEY = VALID_ENCRYPTION_KEY;
@@ -41,7 +41,7 @@ describe("ConfigService", () => {
     expect(service.get()).toEqual({
       mongoUri: "mongodb://localhost:27017/test",
       jwtSecret: "test-secret",
-      httpPort: 8080,
+      httpPort: 8888,
       encryptionKey: Buffer.from(VALID_ENCRYPTION_KEY, "hex"),
     });
   });

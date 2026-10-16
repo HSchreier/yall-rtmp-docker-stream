@@ -47,28 +47,45 @@ See the [release notes](https://github.com/HSchreier/yall-rtmp-docker-stream/rel
 
 ## Quick start
 
-Requirements: **[Docker](https://docs.docker.com/get-docker/)** (running), and either **[Bun](https://bun.sh)** already installed or let the script install it for you. macOS or Linux.
+**→ See [QUICK_START.md](QUICK_START.md) for the 3-step setup guide.**
 
+TL;DR:
 ```bash
 git clone https://github.com/HSchreier/yall-rtmp-docker-stream.git
 cd yall-rtmp-docker-stream
 ./scripts/install.sh
+./start-docker.sh start    # Terminal 1
+./server.sh start          # Terminal 2
+# Open http://192.168.188.29:5173
 ```
 
-What that does, in order:
-1. Checks for Bun — installs it via the official installer if missing.
-2. Checks Docker is installed and running — stops with a clear message if not (this one's on you, it needs a GUI install/license).
-3. Copies `.env.example` → `.env` and fills in freshly generated `JWT_SECRET`/`ENCRYPTION_KEY` values. Safe to re-run — won't touch an existing `.env`.
-4. Runs `bun install`.
-5. Starts Mongo (`docker compose up -d mongo`) on `localhost:27117`.
+First visit prompts you to create an admin account. No additional setup needed.
 
-Then start the app:
+### Docker Container Commands
 
 ```bash
-bun run dev
+./start-docker.sh start        # Start MongoDB container
+./start-docker.sh stop         # Stop containers
+./start-docker.sh restart      # Restart MongoDB
+./start-docker.sh status       # Show container status
+./start-docker.sh logs         # Follow MongoDB logs
 ```
 
-Open **http://localhost:8080** — first visit walks you through creating the administrator account. No separate seed step, no CLI command to remember.
+### Dev Server Commands
+
+```bash
+./server.sh start              # Start backend + frontend
+./server.sh stop               # Stop all services
+./server.sh restart            # Restart all services
+./server.sh status             # Show service status
+./server.sh debug [service]    # Tail logs (backend, frontend, all)
+./server.sh logs [service]     # Show last 20 lines
+./server.sh backend            # Start backend only + follow logs
+./server.sh frontend           # Start frontend only + follow logs
+./server.sh shutdown           # Stop + clean up logs & PIDs
+```
+
+Logs are stored in `logs/` directory.
 
 ## Cloud Deployment (Production)
 
@@ -87,7 +104,7 @@ docker compose up -d mongo        # Mongo 7, host-mapped to localhost:27117
 cp .env.example .env              # then fill in JWT_SECRET and ENCRYPTION_KEY yourself, e.g.:
                                    #   openssl rand -hex 32
 bun install
-bun run dev                       # --watch, http://localhost:8080
+bun run dev                       # --watch, http://localhost:8888
 ```
 
 ## Environment variables
@@ -99,7 +116,7 @@ Set in `.env` (never committed — `.env.example` is the template). `ConfigServi
 | `MONGO_URI` | yes | Defaults to `mongodb://localhost:27117/yallcast-dev` — the sidecar runs on your host via `bun run dev`, not inside docker-compose, so it talks to Mongo's host-mapped port, not `mongo:27017`. |
 | `JWT_SECRET` | yes | Signs session tokens. `install.sh` generates one with `openssl rand -hex 32`; do the same if setting up by hand. |
 | `ENCRYPTION_KEY` | yes | 64 hex chars (32 bytes) for AES-256-GCM — encrypts destination stream keys at rest. A different key from `JWT_SECRET` on purpose (signing and at-rest encryption are different cryptographic purposes). `install.sh` generates this one too; by hand it's the same `openssl rand -hex 32`. |
-| `HTTP_PORT` | no (defaults to `8080`) | Where the dashboard/API listens. |
+| `HTTP_PORT` | no (defaults to `8888`) | Where the dashboard/API listens. |
 | `DEBUG` | no (defaults to unset) | Set to `1` or `true` to enable debug-level logging with pretty-printed output. Defaults to info-level with structured JSON output. See [Debugging](#debugging) below. |
 | `LOG_LEVEL` | no (defaults to `debug` if `DEBUG=1`, else `info`) | Fine-grained log level control: `debug`, `info`, `warn`, `error`, `fatal`. Independent of `DEBUG` — can use JSON output at debug level, or pretty-print at warn level. |
 
